@@ -6,29 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bottlenecksDiv = document.getElementById('bottlenecks');
     const optimizationDiv = document.getElementById('optimization');
 
-    // Add event listener to handle file selection
-    fileInput.addEventListener('change', handleFileSelection);
-
     uploadButton.addEventListener('click', uploadFiles);
-
-    function handleFileSelection(event) {
-        const files = event.target.files;
-        console.log('Files selected:', files.length); // Debug log
-        // Display selected file names
-        resultDiv.innerHTML = `<p>Selected files:</p><ul>${Array.from(files).map(file => `<li>${file.name}</li>`).join('')}</ul>`;
-        
-        // Display selected file names to the right of the "Choose Files" button
-        const fileList = document.createElement('div');
-        fileList.id = 'fileList';
-        fileList.innerHTML = `<ul>${Array.from(files).map(file => `<li>${file.name}</li>`).join('')}</ul>`;
-        fileInput.parentNode.appendChild(fileList);
-
-        // Remove previous file list if it exists
-        const existingFileList = document.getElementById('fileList');
-        if (existingFileList) {
-            existingFileList.remove();
-        }
-    }
 
     async function uploadFiles() {
         const files = fileInput.files;
@@ -110,9 +88,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 'High resource consumption'
             ],
             subprocesses: {
-                'P1.1[Data Validation]': ['Data validation failures: 15%', 'Manual review bottleneck'],
-                'P1.2[Error Checking]': ['High false positive rate', 'Sequential processing limitation'],
-                'P1.3[Data Transformation]': ['Memory intensive operations', 'Slow processing speed']
+                'Data Validation': ['Data validation failures: 15%', 'Manual review bottleneck'],
+                'Error Checking': ['High false positive rate', 'Sequential processing limitation'],
+                'Data Transformation': ['Memory intensive operations', 'Slow processing speed']
             }
         },
         'Process 2': {
@@ -121,8 +99,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 'Integration delays'
             ],
             subprocesses: {
-                'P2.1[Data Processing]': ['Queue overflow during peak hours', 'Resource contention'],
-                'P2.2[Integration]': ['API rate limiting issues', 'Synchronization delays']
+                'Data Processing': ['Queue overflow during peak hours', 'Resource contention'],
+                'Integration': ['API rate limiting issues', 'Synchronization delays']
             }
         }
     };
@@ -228,192 +206,86 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Function to check and upgrade Mermaid version
-    async function checkAndUpgradeMermaid() {
-        const currentVersion = mermaid.version;
-        const latestVersion = await fetch('https://api.github.com/repos/mermaid-js/mermaid/releases/latest')
-            .then(response => response.json())
-            .then(data => data.tag_name);
-
-        if (currentVersion !== latestVersion) {
-            console.log(`Upgrading Mermaid from version ${currentVersion} to ${latestVersion}`);
-            const script = document.createElement('script');
-            script.src = `https://cdn.jsdelivr.net/npm/mermaid@${latestVersion}/dist/mermaid.min.js`;
-            script.onload = () => {
-                console.log(`Mermaid upgraded to version ${latestVersion}`);
-                mermaid.initialize({
-                    startOnLoad: true,
-                    securityLevel: 'loose',
-                    flowchart: {
-                        htmlLabels: true,
-                        curve: 'basis'
-                    }
-                });
-                visualizeProcess(); // Re-render the process flowchart
-            };
-            document.head.appendChild(script);
-        } else {
-            console.log(`Mermaid is up-to-date (version ${currentVersion})`);
-        }
-    }
-
-    // Call the function to check and upgrade Mermaid
-    checkAndUpgradeMermaid();
-
     function visualizeProcess(processFlow) {
         // Create the base flowchart with subprocesses
-        let flowchart = [
-            'graph TD',
-            'classDef clickable fill:#f9f,stroke:#333,stroke-width:2px,cursor:pointer',
-            'classDef expanded fill:#fcf,stroke:#ff00de,stroke-width:3px',
-            'classDef default fill:#f0f0f0,stroke:#666',
-            'classDef hover fill:#e6e6e6,stroke:#333,cursor:pointer',
-            '',
-            'A[Start] --> B[Process 1 🔍]',
-            'B --> C[Process 2 🔍]',
-            'C --> D[End]'
-        ];
-
-        // Add subprocess connections for expanded nodes
-        expandedNodes.forEach(node => {
-            const details = processDetails[node];
-            if (!details) return;
-
-            details.subprocesses.forEach((subprocess, index) => {
-                const nodeId = node === 'Process 1' ? 'B' : 'C';
-                const subprocessId = `${nodeId}_${index + 1}`;
-                flowchart.push(`${nodeId} --> ${subprocessId}["${subprocess}"]`);
-            });
-        });
-
-        // Add styling
-        flowchart.push('class B,C clickable');
-        expandedNodes.forEach(node => {
-            const nodeId = node === 'Process 1' ? 'B' : 'C';
-            flowchart.push(`class ${nodeId} expanded`);
-        });
-
-        processFlowDiv.innerHTML = `
-            <style>
-                .process-tooltip {
-                    position: fixed;
-                    background: rgba(0, 0, 0, 0.8);
-                    color: white;
-                    padding: 10px;
-                    border-radius: 5px;
-                    font-size: 14px;
-                    max-width: 300px;
-                    z-index: 1000;
-                    pointer-events: none;
-                    visibility: hidden;
-                }
-                .clickable {
-                    cursor: pointer;
-                }
-            </style>
-            <h2>Process Flowchart</h2>
-            <p class="click-hint">👆 Click on process boxes with 🔍 to see details (hover to see bottlenecks)</p>
-            <div class="mermaid">${flowchart.join('\n')}</div>
-            <div id="tooltip" class="process-tooltip"></div>
+        const flowchart = `
+            graph TD
+            classDef clickable fill:#f9f,stroke:#333,stroke-width:2px,cursor:pointer;
+            classDef expanded fill:#fcf,stroke:#ff00de,stroke-width:3px;
+            classDef default fill:#f0f0f0,stroke:#666;
+            
+            %% Main process flow
+            A[Start] --> B[Process 1 🔍]
+            B --> C[Process 2 🔍]
+            C --> D[End]
+            
+            %% Add subprocess connections for expanded nodes
+            ${Array.from(expandedNodes).map(node => {
+                const details = processDetails[node];
+                if (!details) return '';
+                
+                // Create subprocess nodes and connections
+                let subprocessFlow = [];
+                details.subprocesses.forEach((subprocess, index) => {
+                    if (node === 'Process 1') {
+                        subprocessFlow.push(`B --> P1_${index}${subprocess}`);
+                    } else if (node === 'Process 2') {
+                        subprocessFlow.push(`C --> P2_${index}${subprocess}`);
+                    }
+                });
+                return subprocessFlow.join('\n');
+            }).join('\n')}
+            
+            %% Style nodes
+            class B,C clickable;
+            ${Array.from(expandedNodes).map(node => `class ${node === 'Process 1' ? 'B' : 'C'} expanded`).join('\n')}
+            
+            %% Add tooltips
+            click B callback "Click to see details of Process 1"
+            click C callback "Click to see details of Process 2"
+            
+            %% Add bottleneck tooltips
+            ${Object.entries(processBottlenecks).map(([process, bottlenecks]) => `
+                B:::tooltip[${bottlenecks.main.join('<br>')}]
+                ${Object.entries(bottlenecks.subprocesses).map(([subprocess, issues], index) => `
+                    P1_${index}:::tooltip[${issues.join('<br>')}]
+                `).join('\n')}
+            `).join('\n')}
         `;
 
-        try {
-            mermaid.initialize({
-                startOnLoad: true,
-                securityLevel: 'loose',
-                flowchart: {
-                    htmlLabels: true,
-                    curve: 'basis'
-                }
-            });
+        processFlowDiv.innerHTML = `
+            <h2>Process Flowchart</h2>
+            <p class="click-hint">👆 Click on process boxes with 🔍 to see details</p>
+            <div class="mermaid">${flowchart}</div>
+        `;
 
-            mermaid.init(undefined, '.mermaid');
+        // Force Mermaid to re-render
+        mermaid.initialize({
+            startOnLoad: true,
+            securityLevel: 'loose',
+            flowchart: {
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
 
-            // Add hover functionality after Mermaid renders
-            setTimeout(() => {
-                const tooltip = document.getElementById('tooltip');
-                
-                // Update selector to target both main processes and subprocesses
-                document.querySelectorAll('.clickable, [id^="B_"], [id^="C_"]').forEach(node => {
-                    // Add click handler for main processes
-                    if (node.classList.contains('clickable')) {
-                        node.addEventListener('click', () => {
-                            const processName = node.textContent.includes('Process 1') ? 'Process 1' : 'Process 2';
-                            toggleDetails(processName);
-                        });
-                    }
+        const callback = function(nodeId) {
+            const processName = nodeId === 'B' ? 'Process 1' : 'Process 2';
+            if (expandedNodes.has(processName)) {
+                expandedNodes.delete(processName);
+            } else {
+                expandedNodes.add(processName);
+            }
+            
+            showProcessDetails(processName);
+            showBottlenecks(processName);
+            showOptimization(processName);
+            visualizeProcess(processFlow);
+        };
 
-                    // Add hover handlers for both main processes and subprocesses
-                    node.addEventListener('mouseenter', (e) => {
-                        let tooltipContent = '';
-                        if (node.classList.contains('clickable')) {
-                            // Main process hover
-                            const processName = node.textContent.includes('Process 1') ? 'Process 1' : 'Process 2';
-                            const bottlenecks = processBottlenecks[processName];
-                            if (bottlenecks) {
-                                tooltipContent = `
-                                    <strong>Bottlenecks:</strong>
-                                    <ul style="margin: 5px 0; padding-left: 20px;">
-                                        ${bottlenecks.main.map(b => `<li>${b}</li>`).join('')}
-                                    </ul>
-                                `;
-                            }
-                        } else {
-                            // Subprocess hover
-                            const processName = node.id.startsWith('B_') ? 'Process 1' : 'Process 2';
-                            const subprocessName = node.textContent.replace(/[\[\]]/g, '');
-                            const bottlenecks = processBottlenecks[processName]?.subprocesses[subprocessName];
-                            if (bottlenecks) {
-                                tooltipContent = `
-                                    <strong>Subprocess Bottlenecks:</strong>
-                                    <ul style="margin: 5px 0; padding-left: 20px;">
-                                        ${bottlenecks.map(b => `<li>${b}</li>`).join('')}
-                                    </ul>
-                                `;
-                            }
-                        }
-
-                        if (tooltipContent) {
-                            tooltip.innerHTML = tooltipContent;
-                            tooltip.style.visibility = 'visible';
-                        }
-                    });
-
-                    node.addEventListener('mousemove', (e) => {
-                        tooltip.style.left = (e.pageX + 10) + 'px';
-                        tooltip.style.top = (e.pageY - tooltip.offsetHeight - 10) + 'px';
-                    });
-
-                    node.addEventListener('mouseleave', () => {
-                        tooltip.style.visibility = 'hidden';
-                    });
-                });
-            }, 1000);
-        } catch (error) {
-            console.error('Mermaid syntax error:', error);
-            displayMermaidSyntaxError();
-        }
-    }
-
-    function toggleDetails(processName) {
-        if (expandedNodes.has(processName)) {
-            expandedNodes.delete(processName);
-        } else {
-            expandedNodes.add(processName);
-        }
-        
-        visualizeProcess(processDetails); // Pass the correct process details
-        showProcessDetails(processName);
-        showBottlenecks(processName);
-        showOptimization(processName);
-    }
-
-    // Function to display Mermaid syntax error message
-    function displayMermaidSyntaxError() {
-        const errorDiv = document.createElement('div');
-        errorDiv.style.color = 'red';
-        errorDiv.innerText = 'Syntax error in Mermaid diagram. Please check the syntax and try again.';
-        processFlowDiv.appendChild(errorDiv);
+        // Register the click handler with Mermaid
+        mermaid.init(undefined, '.mermaid');
+        window.callback = callback;
     }
 
     function showProcessDetails(processName) {
