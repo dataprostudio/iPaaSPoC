@@ -333,42 +333,60 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 const tooltip = document.getElementById('tooltip');
                 
-                // Update selector to target both main processes and subprocesses
-                document.querySelectorAll('.clickable, [id^="B_"], [id^="C_"]').forEach(node => {
-                    // Add click handler for main processes
-                    if (node.classList.contains('clickable')) {
-                        node.addEventListener('click', () => {
-                            const processName = node.textContent.includes('Process 1') ? 'Process 1' : 'Process 2';
-                            toggleDetails(processName);
-                        });
-                    }
+                // First, handle main process nodes
+                document.querySelectorAll('.node.clickable').forEach(node => {
+                    node.addEventListener('click', () => {
+                        const processName = node.textContent.includes('Process 1') ? 'Process 1' : 'Process 2';
+                        toggleDetails(processName);
+                    });
 
-                    // Add hover handlers for both main processes and subprocesses
+                    setupHoverHandlers(node, tooltip);
+                });
+
+                // Handle all nodes that contain subprocess information
+                document.querySelectorAll('.node').forEach(node => {
+                    const nodeText = node.textContent.trim();
+                    // Check if this is a subprocess node (contains P1.x or P2.x pattern)
+                    if (nodeText.match(/P[12]\.\d+/)) {
+                        setupHoverHandlers(node, tooltip);
+                    }
+                });
+
+                function setupHoverHandlers(node, tooltip) {
                     node.addEventListener('mouseenter', (e) => {
                         let tooltipContent = '';
-                        if (node.classList.contains('clickable')) {
-                            // Main process hover
-                            const processName = node.textContent.includes('Process 1') ? 'Process 1' : 'Process 2';
-                            const bottlenecks = processBottlenecks[processName];
-                            if (bottlenecks) {
+                        const nodeText = node.textContent.trim();
+                        const isMainProcess = node.classList.contains('clickable');
+                        
+                        if (isMainProcess) {
+                            // Handle main process hover
+                            const processName = nodeText.includes('Process 1') ? 'Process 1' : 'Process 2';
+                            const mainBottlenecks = processBottlenecks[processName]?.main;
+                            
+                            if (mainBottlenecks) {
                                 tooltipContent = `
-                                    <strong>Bottlenecks:</strong>
+                                    <div style="max-width: 300px;">
+                                    <strong>Main Process Bottlenecks:</strong>
                                     <ul style="margin: 5px 0; padding-left: 20px;">
-                                        ${bottlenecks.main.map(b => `<li>${b}</li>`).join('')}
+                                        ${mainBottlenecks.map(b => `<li>${b}</li>`).join('')}
                                     </ul>
+                                    </div>
                                 `;
                             }
                         } else {
-                            // Subprocess hover
-                            const processName = node.id.startsWith('B_') ? 'Process 1' : 'Process 2';
-                            const subprocessName = node.textContent.replace(/[\[\]]/g, '');
-                            const bottlenecks = processBottlenecks[processName]?.subprocesses[subprocessName];
-                            if (bottlenecks) {
+                            // Handle subprocess hover
+                            const processName = nodeText.startsWith('P1') ? 'Process 1' : 'Process 2';
+                            const subprocessName = nodeText.match(/P[12]\.\d+\[.*?\]/)?.[0];
+                            
+                            if (subprocessName && processBottlenecks[processName]?.subprocesses[subprocessName]) {
+                                const bottlenecks = processBottlenecks[processName].subprocesses[subprocessName];
                                 tooltipContent = `
-                                    <strong>Subprocess Bottlenecks:</strong>
+                                    <div style="max-width: 300px;">
+                                    <strong>Bottlenecks:</strong>
                                     <ul style="margin: 5px 0; padding-left: 20px;">
                                         ${bottlenecks.map(b => `<li>${b}</li>`).join('')}
                                     </ul>
+                                    </div>
                                 `;
                             }
                         }
@@ -387,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     node.addEventListener('mouseleave', () => {
                         tooltip.style.visibility = 'hidden';
                     });
-                });
+                }
             }, 1000);
         } catch (error) {
             console.error('Mermaid syntax error:', error);
