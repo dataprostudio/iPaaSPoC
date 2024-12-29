@@ -6,7 +6,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="format-detection" content="telephone=no">
-    <title>NX8020-™ - Process Miner and Integrations Optimizer</title>
+    <title>NX8020­™ - Process Miner and Integrations Optimizer</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script>
         mermaid.initialize({
@@ -17,75 +17,72 @@
     </script>
     <style>
         body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #F9F7F7;
-            color: #333333;
+            background-color: #000;
+            color: #fff;
         }
         .container {
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
         }
-        h1 {
-            font-size: 2.5em;
-            color: #333333;
+        .neonText {
+            font-size: 3em;
+            color: #fff;
             text-align: center;
-            font-weight: 300;
+            text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #fff, 0 0 20px #ff00de, 0 0 35px #ff00de, 0 0 40px #ff00de, 0 0 50px #ff00de, 0 0 75px #ff00de;
         }
         .section {
-            background-color: #FFFFFF;
+            background-color: rgba(255, 255, 255, 0.1);
             padding: 20px;
             margin-bottom: 20px;
             border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         input[type="file"], button {
             width: 100%;
             padding: 10px;
             margin-bottom: 10px;
-            border: 1px solid #DDDDDD;
-            background-color: #FFFFFF;
-            color: #333333;
+            border: none;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: #fff;
             border-radius: 4px;
         }
         button {
-            background-color: #8EACCD;
-            color: #FFFFFF;
+            background-color: #ff00de;
             cursor: pointer;
             transition: background-color 0.3s;
-            border: none;
         }
         button:hover {
-            background-color: #7D9BBF;
+            background-color: #cc00b1;
         }
         #result, #bottlenecks, #optimization {
             margin-top: 20px;
             padding: 10px;
-            background-color: #FFFFFF;
-            border-left: 6px solid #8EACCD;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-left: 6px solid #ff00de;
         }
         #processFlow {
-            background-color: #FFFFFF;
+            background-color: #fff;
             padding: 20px;
             border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         #footer {
             text-align: center;
             padding: 20px;
-            background-color: #EAEAEA;
-            color: #333333;
+            background-color: #333;
+            color: #fff;
         }
         #processDetails {
             margin-top: 20px;
             padding: 15px;
-            background-color: #FFFFFF;
+            background-color: rgba(255, 255, 255, 0.1);
             border-radius: 5px;
-            border-left: 6px solid #8EACCD;
+            border-left: 6px solid #ff00de;
             animation: slideIn 0.3s ease-out;
         }
+
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -96,94 +93,109 @@
                 transform: translateX(0);
             }
         }
+
         .mermaid .node {
             cursor: pointer;
         }
+
         .mermaid .node.expanded rect {
             stroke-width: 3px;
-            stroke: #8EACCD;
+            stroke: #ff00de;
         }
+
         .click-hint {
-            color: #8EACCD;
+            color: #ff00de;
             text-align: center;
             margin-bottom: 15px;
             font-style: italic;
         }
+
         .mermaid .node rect {
             transition: all 0.3s ease;
         }
+
         .mermaid .node:hover rect {
             filter: brightness(1.1);
             transform: scale(1.02);
         }
+
         .bottleneck-section {
             margin-bottom: 20px;
             padding: 15px;
-            background-color: #FFFFFF;
+            background-color: rgba(255, 255, 255, 0.05);
             border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
         .subprocess-bottlenecks {
             margin-left: 20px;
             padding: 10px;
-            border-left: 3px solid #8EACCD;
+            border-left: 3px solid #ff00de;
             margin-bottom: 15px;
         }
+
         .subprocess-bottlenecks h4 {
-            color: #8EACCD;
+            color: #ff00de;
             margin: 5px 0;
         }
+
         .bottleneck-section ul {
             margin: 10px 0;
             padding-left: 20px;
         }
+
         .bottleneck-section li {
             margin: 5px 0;
-            color: #555555;
+            color: #ff9999;
         }
+
         .optimization-summary {
-            background-color: rgba(142, 172, 205, 0.1);
+            background-color: rgba(255, 0, 222, 0.1);
             padding: 15px;
             border-radius: 5px;
             margin-bottom: 20px;
         }
+
         .optimization-section {
             margin-bottom: 25px;
             padding: 15px;
-            background-color: #FFFFFF;
+            background-color: rgba(255, 255, 255, 0.05);
             border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
         .tool-recommendation {
-            background-color: rgba(142, 172, 205, 0.05);
+            background-color: rgba(255, 0, 222, 0.05);
             padding: 15px;
             margin: 10px 0;
-            border-left: 3px solid #8EACCD;
+            border-left: 3px solid #ff00de;
             border-radius: 0 5px 5px 0;
         }
+
         .subprocess-optimization {
             margin: 15px 0;
             padding: 10px;
-            border-left: 2px solid #8EACCD;
+            border-left: 2px solid #ff00de;
         }
+
         .impact {
-            color: #8EACCD;
+            color: #ff00de;
             font-style: italic;
         }
+
         .optimization-details ul {
             margin: 10px 0;
             padding-left: 20px;
         }
+
         .optimization-details li {
             margin: 5px 0;
-            color: #555555;
+            color: #ddd;
         }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>NX8020™ - Process Optimizer</h1>
+        <h1 class="neonText">NX8020™ - Process Optimizer</h1>
         
         <div class="section">
             <h2>Upload CRM/ERP Log Files</h2>
