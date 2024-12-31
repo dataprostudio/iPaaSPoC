@@ -54,16 +54,28 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('Sending request to server...'); // Debug log
             const response = await fetch('/upload-and-analyze', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: {
+                    // Don't set Content-Type here, let the browser set it with boundary
+                    'Accept': 'application/json'
+                }
             });
 
             console.log('Response status:', response.status); // Debug log
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorData = await response.json().catch(() => ({
+                    error: 'Unknown error',
+                    message: `Server returned ${response.status}`
+                }));
+                throw new Error(errorData.message || errorData.error);
             }
 
             const data = await response.json();
+            if (data.error) {
+                throw new Error(data.message || data.error);
+            }
+
             console.log('Received data:', data); // Debug log
             
             resultDiv.innerText = 'Analysis complete!';
@@ -72,7 +84,13 @@ document.addEventListener('DOMContentLoaded', () => {
             showOptimization(data.optimization);
         } catch (error) {
             console.error('Error:', error);
-            resultDiv.innerText = 'Error uploading and analyzing files: ' + error.message;
+            resultDiv.innerHTML = `
+                <div class="error-message">
+                    Error uploading and analyzing files:<br>
+                    ${error.message}<br>
+                    <small>Please try again or contact support if the problem persists.</small>
+                </div>
+            `;
         }
     }
 
@@ -260,156 +278,111 @@ document.addEventListener('DOMContentLoaded', () => {
     // Call the function to check and upgrade Mermaid
     checkAndUpgradeMermaid();
 
+    // Add LLM status check
+    async function checkLLMStatus() {
+        try {
+            const response = await fetch('/llm-status');
+            const status = await response.json();
+            
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'llm-status';
+            statusDiv.innerHTML = `
+                <div class="status-indicator ${status.available ? 'available' : 'unavailable'}">
+                    LLM Status: ${status.available ? 'Available' : 'Fallback Mode'}
+                </div>
+                ${status.error ? `
+                    <div class="status-error">
+                        <p>Error: ${status.error}</p>
+                        <p>Model Path: ${status.modelPath}</p>
+                        ${status.downloadInstructions ? `
+                            <p>Download Instructions: 
+                                <a href="${status.downloadInstructions.split(' ')[1]}" target="_blank">
+                                    Download Model
+                                </a>
+                            </p>
+                        ` : ''}
+                    </div>
+                ` : ''}
+            `;
+            
+            document.querySelector('.container').insertBefore(
+                statusDiv, 
+                document.querySelector('.container').firstChild
+            );
+        } catch (error) {
+            console.error('Failed to check LLM status:', error);
+        }
+    }
+
+    // Call status check on page load
+    checkLLMStatus();
+
     function visualizeProcess(processFlow) {
-        // Create the base flowchart with subprocesses
+        if (!processFlow || !Array.isArray(processFlow)) {
+            console.error('Invalid process flow data:', processFlow);
+            return;
+        }
+
+        // Create Mermaid diagram nodes with unique styling
         let flowchart = [
-            'graph TD',
-            'classDef clickable fill:#f9f,stroke:#333,stroke-width:2px,cursor:pointer',
-            'classDef expanded fill:#fcf,stroke:#ff00de,stroke-width:3px',
-            'classDef default fill:#f0f0f0,stroke:#666',
-            'classDef hover fill:#e6e6e6,stroke:#333,cursor:pointer',
-            '',
-            'A[Start] --> B[Process 1 🔍]',
-            'B --> C[Process 2 🔍]',
-            'C --> D[End]'
+            'graph LR',
+            'classDef process fill:#ff00de,stroke:#333,stroke-width:2px,color:#fff',
+            'classDef start fill:#00ff00,stroke:#333,stroke-width:2px,color:#000',
+            'classDef end fill:#ff0000,stroke:#333,stroke-width:2px,color:#fff'
         ];
 
-        // Add subprocess connections for expanded nodes
-        expandedNodes.forEach(node => {
-            const details = processDetails[node];
-            if (!details) return;
-
-            details.subprocesses.forEach((subprocess, index) => {
-                const nodeId = node === 'Process 1' ? 'B' : 'C';
-                const subprocessId = `${nodeId}_${index + 1}`;
-                flowchart.push(`${nodeId} --> ${subprocessId}["${subprocess}"]`);
-            });
+        // Generate node connections with unique IDs and styled nodes
+        processFlow.forEach((step, index) => {
+            const nodeId = `step${index}`;
+            const nextNodeId = `step${index + 1}`;
+            
+            if (index < processFlow.length - 1) {
+                flowchart.push(`${nodeId}["${step}"] --> ${nextNodeId}["${processFlow[index + 1]}"]`);
+            }
+            
+            // Apply styling classes
+            if (index === 0) {
+                flowchart.push(`class ${nodeId} start`);
+            } else if (index === processFlow.length - 1) {
+                flowchart.push(`class ${nodeId} end`);
+            } else {
+                flowchart.push(`class ${nodeId} process`);
+            }
         });
 
-        // Add styling
-        flowchart.push('class B,C clickable');
-        expandedNodes.forEach(node => {
-            const nodeId = node === 'Process 1' ? 'B' : 'C';
-            flowchart.push(`class ${nodeId} expanded`);
-        });
-
+        // Create container for the flowchart
         processFlowDiv.innerHTML = `
-            <style>
-                .process-tooltip {
-                    position: fixed;
-                    background: rgba(0, 0, 0, 0.8);
-                    color: white;
-                    padding: 10px;
-                    border-radius: 5px;
-                    font-size: 14px;
-                    max-width: 300px;
-                    z-index: 1000;
-                    pointer-events: none;
-                    visibility: hidden;
-                }
-                .clickable {
-                    cursor: pointer;
-                }
-            </style>
             <h2>Process Flowchart</h2>
-            <p class="click-hint">👆 Click on process boxes with 🔍 to see details (hover to see bottlenecks)</p>
-            <div class="mermaid">${flowchart.join('\n')}</div>
-            <div id="tooltip" class="process-tooltip"></div>
+            <div class="mermaid">
+                ${flowchart.join('\n')}
+            </div>
         `;
 
+        // Initialize and render Mermaid diagram
         try {
             mermaid.initialize({
                 startOnLoad: true,
                 securityLevel: 'loose',
+                theme: 'dark',
                 flowchart: {
-                    htmlLabels: true,
-                    curve: 'basis'
+                    curve: 'basis',
+                    nodeSpacing: 50,
+                    rankSpacing: 50,
+                    useMaxWidth: true
                 }
             });
-
-            mermaid.init(undefined, '.mermaid');
-
-            // Add hover functionality after Mermaid renders
-            setTimeout(() => {
-                const tooltip = document.getElementById('tooltip');
-                
-                // First, handle main process nodes
-                document.querySelectorAll('.node.clickable').forEach(node => {
-                    node.addEventListener('click', () => {
-                        const processName = node.textContent.includes('Process 1') ? 'Process 1' : 'Process 2';
-                        toggleDetails(processName);
-                    });
-
-                    setupHoverHandlers(node, tooltip);
-                });
-
-                // Handle all nodes that contain subprocess information
-                document.querySelectorAll('.node').forEach(node => {
-                    const nodeText = node.textContent.trim();
-                    // Check if this is a subprocess node (contains P1.x or P2.x pattern)
-                    if (nodeText.match(/P[12]\.\d+/)) {
-                        setupHoverHandlers(node, tooltip);
-                    }
-                });
-
-                function setupHoverHandlers(node, tooltip) {
-                    node.addEventListener('mouseenter', (e) => {
-                        let tooltipContent = '';
-                        const nodeText = node.textContent.trim();
-                        const isMainProcess = node.classList.contains('clickable');
-                        
-                        if (isMainProcess) {
-                            // Handle main process hover
-                            const processName = nodeText.includes('Process 1') ? 'Process 1' : 'Process 2';
-                            const mainBottlenecks = processBottlenecks[processName]?.main;
-                            
-                            if (mainBottlenecks) {
-                                tooltipContent = `
-                                    <div style="max-width: 300px;">
-                                    <strong>Main Process Bottlenecks:</strong>
-                                    <ul style="margin: 5px 0; padding-left: 20px;">
-                                        ${mainBottlenecks.map(b => `<li>${b}</li>`).join('')}
-                                    </ul>
-                                    </div>
-                                `;
-                            }
-                        } else {
-                            // Handle subprocess hover
-                            const processName = nodeText.startsWith('P1') ? 'Process 1' : 'Process 2';
-                            const subprocessName = nodeText.match(/P[12]\.\d+\[.*?\]/)?.[0];
-                            
-                            if (subprocessName && processBottlenecks[processName]?.subprocesses[subprocessName]) {
-                                const bottlenecks = processBottlenecks[processName].subprocesses[subprocessName];
-                                tooltipContent = `
-                                    <div style="max-width: 300px;">
-                                    <strong>Bottlenecks:</strong>
-                                    <ul style="margin: 5px 0; padding-left: 20px;">
-                                        ${bottlenecks.map(b => `<li>${b}</li>`).join('')}
-                                    </ul>
-                                    </div>
-                                `;
-                            }
-                        }
-
-                        if (tooltipContent) {
-                            tooltip.innerHTML = tooltipContent;
-                            tooltip.style.visibility = 'visible';
-                        }
-                    });
-
-                    node.addEventListener('mousemove', (e) => {
-                        tooltip.style.left = (e.pageX + 10) + 'px';
-                        tooltip.style.top = (e.pageY - tooltip.offsetHeight - 10) + 'px';
-                    });
-
-                    node.addEventListener('mouseleave', () => {
-                        tooltip.style.visibility = 'hidden';
-                    });
-                }
-            }, 1000);
+            
+            // Force re-render
+            mermaid.contentLoaded();
+            
+            console.log('Mermaid diagram generated:', flowchart.join('\n'));
         } catch (error) {
-            console.error('Mermaid syntax error:', error);
-            displayMermaidSyntaxError();
+            console.error('Mermaid rendering error:', error);
+            processFlowDiv.innerHTML += `
+                <div class="error-message">
+                    Error rendering process diagram: ${error.message}
+                </div>
+            `;
         }
     }
 

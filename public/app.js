@@ -55,20 +55,21 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('files', files[i]);
         }
 
-        const response = await fetch('/upload-and-analyze', {
+        const response = await fetch('http://localhost:3001/upload-and-analyze', {
             method: 'POST',
             body: formData
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
         }
 
         return await response.json();
     }
 
     async function streamAndAnalyzeData(source) {
-        const response = await fetch('/stream-and-analyze', {
+        const response = await fetch('http://localhost:3001/stream-and-analyze', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -77,7 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
         }
 
         return await response.json();

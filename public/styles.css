@@ -90,6 +90,62 @@ h1, h2 {
     padding-left: 20px;
 }
 
+/* LLM Status Styles */
+.llm-status {
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: 5px;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.status-indicator {
+    padding: 10px;
+    border-radius: 4px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.status-indicator.available {
+    background-color: #00ff00;
+    color: #000;
+}
+
+.status-indicator.unavailable {
+    background-color: #ff0000;
+    color: #fff;
+}
+
+.status-error {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: rgba(255, 0, 0, 0.1);
+    border-left: 4px solid #ff0000;
+}
+
+.status-error a {
+    color: #ff00de;
+    text-decoration: none;
+}
+
+.status-error a:hover {
+    text-decoration: underline;
+}
+
+/* Error Message */
+.error-message {
+    background-color: rgba(255, 0, 0, 0.1);
+    border-left: 4px solid #ff0000;
+    padding: 15px;
+    margin: 10px 0;
+    color: #ff0000;
+}
+
+.error-message small {
+    display: block;
+    margin-top: 8px;
+    color: #ff6b6b;
+}
+
 /* Footer */
 #footer {
     text-align: center;
