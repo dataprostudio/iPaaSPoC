@@ -4,8 +4,8 @@ import multer from 'multer';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { OrchestratorAgent } from './agents/orchestrator-agent.js';
 
-// Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -16,44 +16,55 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(join(__dirname, '../public')));
 
-// Add a specific route for the root path
-app.get('/', (req, res) => {
-    res.sendFile(join(__dirname, '../public/index.html'));
-});
+// Configure model path - can be overridden via environment variable
+const modelPath = process.env.LLM_MODEL_PATH || join(process.cwd(), 'models', 'llama-2-7b-chat.gguf');
 
-// Update the route to match what's in your frontend code
-app.post('/upload-and-analyze', upload.array('files'), (req, res) => {
-    console.log('Received request'); // Debug log
-    console.log('Files:', req.files); // Debug log
+try {
+    const orchestrator = new OrchestratorAgent(modelPath);
 
-    if (req.files && req.files.length > 0) {
-        console.log('Processing files...'); // Debug log
-        
-        // Mock response data for testing
-        const mockResponse = {
-            processFlow: [
-                'A[Start] --> B[Process 1]',
-                'B --> C[Process 2]',
-                'C --> D[End]'
-            ],
-            bottlenecks: [
-                'Process 1 takes too long',
-                'Process 2 has high error rate'
-            ],
-            optimization: 'Suggested optimization: Implement parallel processing in Process 1'
-        };
-        
-        console.log('Sending response:', mockResponse); // Debug log
-        res.json(mockResponse);
-    } else {
-        console.log('No files received'); // Debug log
-        res.status(400).send('No files uploaded');
-    }
-});
+    app.get('/', (req, res) => {
+        res.sendFile(join(__dirname, '../public/index.html'));
+    });
 
-const PORT = process.env.PORT || 3000;
-const DOMAIN = process.env.DOMAIN || 'localhost';
+    app.post('/upload-and-analyze', upload.array('files'), async (req, res) => {
+        console.log('Received file upload request');
+        if (req.files && req.files.length > 0) {
+            try {
+                const filePaths = req.files.map(file => file.path);
+                const result = await orchestrator.orchestrate(filePaths);
+                res.json(result);
+            } catch (error) {
+                console.error('Error processing files:', error);
+                res.status(500).json({ error: 'Error processing files' });
+            }
+        } else {
+            res.status(400).send('No files uploaded');
+        }
+    });
 
-app.listen(PORT, () => {
-    console.log(`Server is running on ${DOMAIN}:${PORT}`);
-});
+    app.post('/stream-and-analyze', async (req, res) => {
+        console.log('Received streaming request');
+        const { source } = req.body;
+        if (source) {
+            try {
+                const result = await orchestrator.orchestrateStream(source);
+                res.json(result);
+            } catch (error) {
+                console.error('Error processing stream:', error);
+                res.status(500).json({ error: 'Error processing stream' });
+            }
+        } else {
+            res.status(400).send('No data source specified');
+        }
+    });
+
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
+    });
+} catch (error) {
+    console.error('Failed to initialize orchestrator:', error);
+    console.error('Please ensure the model file is present in the models directory');
+    process.exit(1);
+}
+
