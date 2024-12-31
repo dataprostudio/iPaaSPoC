@@ -7,7 +7,13 @@ import fs from 'fs'
 export class OrchestratorAgent {
   constructor(modelPath) {
     this.llmAvailable = false;
-    this.modelPath = modelPath || path.join(process.cwd(), 'models', 'llama-2-7b-chat.gguf')
+    this.modelPath = modelPath || path.join(process.cwd(), 'Models', 'Llama-3.2-3B-GGUF', 'Llama-3.2-3B.Q4_K_M.gguf')
+    this.modelConfig = {
+      contextSize: 8192,  // Increased context size for Llama 3.1
+      gpu_layers: 35,     // Use GPU for half the layers
+      threads: 8,         // Adjust based on your CPU
+      threads_batch: 8    // Parallel batch processing threads
+    }
     this.analysisAgent = new AnalysisAgent()
     this.pipelineAgent = new PipelineAgent()
     this.testEnv = new TestEnvironment()
@@ -33,7 +39,7 @@ export class OrchestratorAgent {
     try {
       this.model = new LlamaModel({
         modelPath: this.modelPath,
-        contextSize: 4096,
+        ...this.modelConfig
       })
       this.context = new LlamaContext({ model: this.model })
       this.session = new LlamaChatSession({ context: this.context })
@@ -50,6 +56,12 @@ export class OrchestratorAgent {
       this.session = null
       throw error;
     }
+  }
+
+  async formatPrompt(text, systemPrompt) {
+    // Llama 3.1 specific prompt formatting
+    return `[INST] ${systemPrompt}
+${text} [/INST]`;
   }
 
   async getLLMStatus() {
@@ -134,7 +146,10 @@ export class OrchestratorAgent {
       // Step 2: Generate implementation plan
       let implementationPlan;
       if (this.session) {
-        const prompt = `Create implementation plan for: ${JSON.stringify({ analysis, suggestions })}`;
+        const prompt = await this.formatPrompt(
+          `Create implementation plan for: ${JSON.stringify({ analysis, suggestions })}`,
+          'You are a system architect. Create detailed implementation plans for system optimizations.'
+        );
         implementationPlan = await this.session.prompt(
           prompt,
           'You are a system architect. Create detailed implementation plans for system optimizations.'
@@ -205,6 +220,85 @@ export class OrchestratorAgent {
     await this.pipelineAgent.stopListening()
     this.context.free()
     this.model.free()
+  }
+
+  async analyzeFiles(files) {
+    try {
+        // Generate a system prompt for file analysis
+        const systemPrompt = `Analyze the following files and create a process flow diagram. 
+        Identify integration patterns, data flows, and potential bottlenecks.`;
+
+        // Prepare files content for analysis
+        const filesContent = files.map(f => `File: ${f.name}\n\n${f.content}`).join('\n\n');
+
+        // If LLM is not available, provide basic analysis
+        if (!this.llm) {
+            return this.generateBasicAnalysis(files);
+        }
+
+        // Use LLM to analyze files
+        const analysis = await this.llm.complete(systemPrompt, filesContent);
+        
+        // Parse the LLM response and structure it
+        return this.structureAnalysis(analysis, files);
+    } catch (error) {
+        console.error('Analysis error in orchestrator:', error);
+        return this.generateBasicAnalysis(files);
+    }
+  }
+
+  generateBasicAnalysis(files) {
+    // Generate a basic analysis when LLM is not available
+    return {
+        processFlow: files.map(f => f.name),
+        nodes: files.map((f, i) => ({
+            id: i.toString(),
+            label: f.name,
+            type: 'file'
+        })),
+        edges: files.slice(1).map((_, i) => ({
+            id: `e${i}`,
+            source: (i).toString(),
+            target: (i + 1).toString()
+        })),
+        bottlenecks: {
+            identified: false,
+            message: 'Basic analysis mode - LLM analysis not available'
+        },
+        optimization: {
+            suggestions: ['Enable LLM for detailed analysis']
+        },
+        details: {
+            filesAnalyzed: files.map(f => f.name),
+            mode: 'basic'
+        }
+    };
+  }
+
+  structureAnalysis(llmResponse, files) {
+    // Convert LLM response into structured format
+    const analysis = {
+        processFlow: [],
+        nodes: [],
+        edges: [],
+        bottlenecks: {},
+        optimization: {},
+        details: {}
+    };
+
+    try {
+        // Parse LLM response and populate analysis
+        // This is a simplified version - enhance based on your LLM's output format
+        const parsedResponse = typeof llmResponse === 'string' ? 
+            JSON.parse(llmResponse) : llmResponse;
+        
+        Object.assign(analysis, parsedResponse);
+    } catch (error) {
+        console.error('Error structuring analysis:', error);
+        return this.generateBasicAnalysis(files);
+    }
+
+    return analysis;
   }
 }
 

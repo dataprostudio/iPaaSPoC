@@ -87,13 +87,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function displayResults(data) {
         resultDiv.innerText = 'Analysis complete!';
-        visualizeProcess(data.processFlow);
+        
+        // Check Mermaid status before rendering
+        if (checkMermaidStatus()) {
+            visualizeProcess(data.processFlow);
+        } else {
+            processFlowDiv.innerHTML = '<div class="error-message">Unable to load diagram rendering library</div>';
+        }
+        
         showBottlenecks(data.bottlenecks);
         showOptimization(data.optimization);
     }
 
     function visualizeProcess(processFlow) {
-        // Implementation remains the same
+        if (!processFlow || !Array.isArray(processFlow)) {
+            console.error('Invalid process flow data:', processFlow);
+            return;
+        }
+
+        const container = document.getElementById('mermaidContainer');
+        if (!container) {
+            console.error('Mermaid container not found');
+            return;
+        }
+
+        // Build the Mermaid diagram definition
+        const diagram = [
+            'graph TD',
+            'classDef default fill:#f9f,stroke:#333,stroke-width:2px;',
+            'classDef active fill:#f96,stroke:#333,stroke-width:4px;'
+        ];
+
+        // Add nodes and connections
+        processFlow.forEach((step, index) => {
+            const currentId = `step${index}`;
+            const nextId = `step${index + 1}`;
+            const cleanStep = step.replace(/[^a-zA-Z0-9\s-]/g, ''); // Clean the step text
+
+            if (index < processFlow.length - 1) {
+                diagram.push(`    ${currentId}["${cleanStep}"] --> ${nextId}["${processFlow[index + 1]}"]`);
+            }
+        });
+
+        const diagramDefinition = diagram.join('\n');
+        container.innerHTML = diagramDefinition;
+
+        // Clear any existing diagrams and render the new one
+        try {
+            mermaid.contentLoaded();
+        } catch (error) {
+            console.error('Mermaid rendering error:', error);
+            container.innerHTML = `
+                <div class="error-message">
+                    Error rendering process diagram: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    // Update the checkMermaidStatus function
+    function checkMermaidStatus() {
+        if (typeof mermaid === 'undefined') {
+            console.error('Mermaid is not loaded!');
+            return false;
+        }
+        // Remove the version check and just verify mermaid is available
+        return true;
     }
 
     function showBottlenecks(bottlenecks) {

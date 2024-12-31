@@ -63,17 +63,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             console.log('Response status:', response.status); // Debug log
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({
-                    error: 'Unknown error',
-                    message: `Server returned ${response.status}`
-                }));
-                throw new Error(errorData.message || errorData.error);
+            // Get the response text first
+            const responseText = await response.text();
+            let data;
+            
+            try {
+                // Try to parse it as JSON
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('JSON Parse Error:', parseError);
+                console.error('Raw response:', responseText);
+                throw new Error('Server returned invalid JSON response');
             }
 
-            const data = await response.json();
-            if (data.error) {
-                throw new Error(data.message || data.error);
+            if (!response.ok || data.error) {
+                throw new Error(data.message || data.error || `Server error: ${response.status}`);
             }
 
             console.log('Received data:', data); // Debug log
@@ -248,34 +252,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to check and upgrade Mermaid version
     async function checkAndUpgradeMermaid() {
-        const currentVersion = mermaid.version;
-        const latestVersion = await fetch('https://api.github.com/repos/mermaid-js/mermaid/releases/latest')
-            .then(response => response.json())
-            .then(data => data.tag_name);
-
-        if (currentVersion !== latestVersion) {
-            console.log(`Upgrading Mermaid from version ${currentVersion} to ${latestVersion}`);
-            const script = document.createElement('script');
-            script.src = `https://cdn.jsdelivr.net/npm/mermaid@${latestVersion}/dist/mermaid.min.js`;
-            script.onload = () => {
-                console.log(`Mermaid upgraded to version ${latestVersion}`);
-                mermaid.initialize({
-                    startOnLoad: true,
-                    securityLevel: 'loose',
-                    flowchart: {
-                        htmlLabels: true,
-                        curve: 'basis'
-                    }
-                });
-                visualizeProcess(); // Re-render the process flowchart
-            };
-            document.head.appendChild(script);
-        } else {
-            console.log(`Mermaid is up-to-date (version ${currentVersion})`);
-        }
+        // Simplified Mermaid initialization
+        mermaid.initialize({
+            startOnLoad: true,
+            securityLevel: 'loose',
+            flowchart: {
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
     }
 
-    // Call the function to check and upgrade Mermaid
+    // Call the function to initialize Mermaid
     checkAndUpgradeMermaid();
 
     // Add LLM status check
@@ -323,64 +311,46 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Create Mermaid diagram nodes with unique styling
-        let flowchart = [
-            'graph LR',
-            'classDef process fill:#ff00de,stroke:#333,stroke-width:2px,color:#fff',
-            'classDef start fill:#00ff00,stroke:#333,stroke-width:2px,color:#000',
-            'classDef end fill:#ff0000,stroke:#333,stroke-width:2px,color:#fff'
+        // Clear previous content
+        processFlowDiv.innerHTML = '<h2>Process Flowchart</h2>';
+
+        // Create a container for the Mermaid diagram
+        const diagramContainer = document.createElement('div');
+        diagramContainer.className = 'mermaid';
+        
+        // Build the Mermaid diagram definition
+        const diagram = [
+            'graph TD',
+            'classDef default fill:#f9f,stroke:#333,stroke-width:2px;',
+            'classDef active fill:#f96,stroke:#333,stroke-width:4px;'
         ];
 
-        // Generate node connections with unique IDs and styled nodes
+        // Add nodes and connections
         processFlow.forEach((step, index) => {
-            const nodeId = `step${index}`;
-            const nextNodeId = `step${index + 1}`;
-            
             if (index < processFlow.length - 1) {
-                flowchart.push(`${nodeId}["${step}"] --> ${nextNodeId}["${processFlow[index + 1]}"]`);
-            }
-            
-            // Apply styling classes
-            if (index === 0) {
-                flowchart.push(`class ${nodeId} start`);
-            } else if (index === processFlow.length - 1) {
-                flowchart.push(`class ${nodeId} end`);
-            } else {
-                flowchart.push(`class ${nodeId} process`);
+                const currentId = `step${index}`;
+                const nextId = `step${index + 1}`;
+                diagram.push(`${currentId}["${step}"] --> ${nextId}["${processFlow[index + 1]}"]`);
             }
         });
 
-        // Create container for the flowchart
-        processFlowDiv.innerHTML = `
-            <h2>Process Flowchart</h2>
-            <div class="mermaid">
-                ${flowchart.join('\n')}
-            </div>
-        `;
+        // Set the diagram definition
+        diagramContainer.textContent = diagram.join('\n');
+        
+        // Add the container to the DOM
+        processFlowDiv.appendChild(diagramContainer);
 
-        // Initialize and render Mermaid diagram
+        // Clear any existing diagrams
+        diagramContainer.removeAttribute('data-processed');
+
+        // Render the new diagram
         try {
-            mermaid.initialize({
-                startOnLoad: true,
-                securityLevel: 'loose',
-                theme: 'dark',
-                flowchart: {
-                    curve: 'basis',
-                    nodeSpacing: 50,
-                    rankSpacing: 50,
-                    useMaxWidth: true
-                }
-            });
-            
-            // Force re-render
             mermaid.contentLoaded();
-            
-            console.log('Mermaid diagram generated:', flowchart.join('\n'));
         } catch (error) {
             console.error('Mermaid rendering error:', error);
             processFlowDiv.innerHTML += `
                 <div class="error-message">
-                    Error rendering process diagram: ${error.message}
+                    Error rendering process diagram. Please check console for details.
                 </div>
             `;
         }

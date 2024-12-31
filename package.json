@@ -10,7 +10,10 @@
     "health": "curl http://ec2-3-96-130-144.ca-central-1.compute.amazonaws.com:3000/health",
     "prebuild": "set PATH=%PATH%;D:\\Program Files\\CMake\\bin && cmake-js configure -O build -D LLAMA_CURL=ON",
     "build": "cmake-js build -O build -B Release",
-    "build-llama": "npm run prebuild && npm run build"
+    "build-llama": "npm run prebuild && npm run build",
+    "prestart": "node scripts/ensure-model-dir.js && npm run validate-model",
+    "validate-model": "node scripts/validate-model.js",
+    "download-model": "node scripts/download-model.js"
   },
   "dependencies": {
     "@faker-js/faker": "^9.3.0",
@@ -20,5 +23,8 @@
     "node-llama-cpp": "^2.8.2",
     "cmake-js": "^7.2.1"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
 }
