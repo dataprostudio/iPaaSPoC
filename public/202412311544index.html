@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        #mermaidContainer, #fallbackContainer {
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        #errorContainer {
+            color: red;
+            font-weight: bold;
+            margin: 20px auto;
+            max-width: 800px;
+        }
+        .node {
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            margin: 10px 0;
+            background-color: #f0f0f0;
+        }
+        .arrow {
+            text-align: center;
+            font-size: 20px;
+            margin: 5px 0;
+        }
+        body {
+            background-color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
+

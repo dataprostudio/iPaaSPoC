@@ -83,9 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('Received data:', data); // Debug log
             
             resultDiv.innerText = 'Analysis complete!';
-            visualizeProcess(data.processFlow);
-            showBottlenecks(data.bottlenecks);
-            showOptimization(data.optimization);
+            displayResults(data);
         } catch (error) {
             console.error('Error:', error);
             resultDiv.innerHTML = `
@@ -305,19 +303,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Call status check on page load
     checkLLMStatus();
 
+    function displayResults(data) {
+        resultDiv.innerText = 'Analysis complete!';
+        
+        // Check Mermaid status before rendering
+        if (checkMermaidStatus()) {
+            visualizeProcess(data.processFlow);
+        } else {
+            processFlowDiv.innerHTML = '<div class="error-message">Unable to load diagram rendering library</div>';
+        }
+        
+        showBottlenecks(data.bottlenecks);
+        showOptimization(data.optimization);
+    }
+
     function visualizeProcess(processFlow) {
         if (!processFlow || !Array.isArray(processFlow)) {
             console.error('Invalid process flow data:', processFlow);
             return;
         }
 
-        // Clear previous content
-        processFlowDiv.innerHTML = '<h2>Process Flowchart</h2>';
+        const container = document.getElementById('mermaidContainer');
+        if (!container) {
+            console.error('Mermaid container not found');
+            return;
+        }
 
-        // Create a container for the Mermaid diagram
-        const diagramContainer = document.createElement('div');
-        diagramContainer.className = 'mermaid';
-        
         // Build the Mermaid diagram definition
         const diagram = [
             'graph TD',
@@ -327,33 +338,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add nodes and connections
         processFlow.forEach((step, index) => {
+            const currentId = `step${index}`;
+            const nextId = `step${index + 1}`;
+            const cleanStep = step.replace(/[^a-zA-Z0-9\s-]/g, ''); // Clean the step text
+
             if (index < processFlow.length - 1) {
-                const currentId = `step${index}`;
-                const nextId = `step${index + 1}`;
-                diagram.push(`${currentId}["${step}"] --> ${nextId}["${processFlow[index + 1]}"]`);
+                diagram.push(`    ${currentId}["${cleanStep}"] --> ${nextId}["${processFlow[index + 1]}"]`);
+            } else {
+                diagram.push(`    ${currentId}["${cleanStep}"]`);
             }
         });
 
-        // Set the diagram definition
-        diagramContainer.textContent = diagram.join('\n');
-        
-        // Add the container to the DOM
-        processFlowDiv.appendChild(diagramContainer);
+        const diagramDefinition = diagram.join('\n');
+        container.innerHTML = `\`\`\`mermaid\n${diagramDefinition}\n\`\`\``;
 
-        // Clear any existing diagrams
-        diagramContainer.removeAttribute('data-processed');
-
-        // Render the new diagram
+        // Clear any existing diagrams and render the new one
         try {
             mermaid.contentLoaded();
         } catch (error) {
             console.error('Mermaid rendering error:', error);
-            processFlowDiv.innerHTML += `
+            container.innerHTML = `
                 <div class="error-message">
-                    Error rendering process diagram. Please check console for details.
+                    Error rendering process diagram: ${error.message}
                 </div>
             `;
         }
+    }
+
+    // Update the checkMermaidStatus function
+    function checkMermaidStatus() {
+        if (typeof mermaid === 'undefined') {
+            console.error('Mermaid is not loaded!');
+            return false;
+        }
+        // Remove the version check and just verify mermaid is available
+        return true;
     }
 
     function toggleDetails(processName) {
@@ -483,4 +502,37 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
     }
+
+    async function generateText(prompt) {
+        try {
+            const response = await fetch('/generate-text', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ prompt })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate text');
+            }
+
+            const data = await response.json();
+            return data.generatedText;
+        } catch (error) {
+            console.error('Error:', error);
+            throw error;
+        }
+    }
+
+    // Example usage
+    document.getElementById('generateButton').addEventListener('click', async () => {
+        const prompt = document.getElementById('promptInput').value;
+        try {
+            const generatedText = await generateText(prompt);
+            document.getElementById('generatedText').innerText = generatedText;
+        } catch (error) {
+            document.getElementById('generatedText').innerText = 'Error generating text';
+        }
+    });
 });

@@ -10,6 +10,44 @@ document.addEventListener('DOMContentLoaded', () => {
     fileInput.addEventListener('change', handleFileSelection);
     analyzeButton.addEventListener('click', handleAnalysis);
 
+    async function checkLLMStatus() {
+        try {
+            const response = await fetch('/llm_status');
+            const status = await response.json();
+            
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'llm-status';
+            statusDiv.innerHTML = `
+                <div class="status-indicator ${status.available ? 'available' : 'unavailable'}">
+                    LLM Status: ${status.available ? 'Available' : 'Fallback Mode'}
+                </div>
+                ${status.error ? `
+                    <div class="status-error">
+                        <p>Error: ${status.error}</p>
+                        <p>Model Path: ${status.modelPath}</p>
+                        ${status.downloadInstructions ? `
+                            <p>Download Instructions: 
+                                <a href="${status.downloadInstructions.split(' ')[1]}" target="_blank">
+                                    Download Model
+                                </a>
+                            </p>
+                        ` : ''}
+                    </div>
+                ` : ''}
+            `;
+            
+            document.querySelector('.container').insertBefore(
+                statusDiv, 
+                document.querySelector('.container').firstChild
+            );
+        } catch (error) {
+            console.error('Failed to check LLM status:', error);
+        }
+    }
+
+    // Call status check on page load
+    checkLLMStatus();
+
     function handleFileSelection(event) {
         const files = event.target.files;
         updateFileList(files);
@@ -42,10 +80,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 response = await streamAndAnalyzeData(selectedSource);
             }
 
-            displayResults(response);
+            // Ensure the response is JSON
+            const responseText = await response.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                throw new Error('Server returned invalid JSON response');
+            }
+
+            displayResults(data);
         } catch (error) {
             console.error('Error:', error);
-            resultDiv.innerText = 'Error analyzing data: ' + error.message;
+            resultDiv.innerHTML = `
+                <div class="error-message">
+                    Error analyzing data:<br>
+                    ${error.message}<br>
+                    <small>Please try again or contact support if the problem persists.</small>
+                </div>
+            `;
         }
     }
 
@@ -55,21 +108,25 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('files', files[i]);
         }
 
-        const response = await fetch('http://localhost:3001/upload-and-analyze', {
-            method: 'POST',
-            body: formData
-        });
+        try {
+            const response = await fetch('/upload-and-analyze', {
+                method: 'POST',
+                body: formData
+            });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Upload error:', error);
+            throw new Error(`Failed to analyze files: ${error.message}`);
         }
-
-        return await response.json();
     }
 
     async function streamAndAnalyzeData(source) {
-        const response = await fetch('http://localhost:3001/stream-and-analyze', {
+        const response = await fetch('/stream-and-analyze', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -77,26 +134,35 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({ source })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            throw new Error('Server returned invalid JSON response');
         }
 
-        return await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        }
+
+        return data;
     }
 
     function displayResults(data) {
         resultDiv.innerText = 'Analysis complete!';
         
-        // Check Mermaid status before rendering
-        if (checkMermaidStatus()) {
+        if (data.processFlow) {
             visualizeProcess(data.processFlow);
-        } else {
-            processFlowDiv.innerHTML = '<div class="error-message">Unable to load diagram rendering library</div>';
         }
         
-        showBottlenecks(data.bottlenecks);
-        showOptimization(data.optimization);
+        if (data.bottlenecks) {
+            showBottlenecks(data.bottlenecks);
+        }
+        
+        if (data.optimization) {
+            showOptimization(data.optimization);
+        }
     }
 
     function visualizeProcess(processFlow) {
@@ -112,55 +178,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Build the Mermaid diagram definition
-        const diagram = [
-            'graph TD',
-            'classDef default fill:#f9f,stroke:#333,stroke-width:2px;',
-            'classDef active fill:#f96,stroke:#333,stroke-width:4px;'
-        ];
-
-        // Add nodes and connections
+        const diagram = ['flowchart TD'];
         processFlow.forEach((step, index) => {
             const currentId = `step${index}`;
             const nextId = `step${index + 1}`;
-            const cleanStep = step.replace(/[^a-zA-Z0-9\s-]/g, ''); // Clean the step text
-
+            const cleanStep = step.replace(/[^a-zA-Z0-9\s]/g, '');
+            diagram.push(`    ${currentId}["${cleanStep}"]`);
             if (index < processFlow.length - 1) {
-                diagram.push(`    ${currentId}["${cleanStep}"] --> ${nextId}["${processFlow[index + 1]}"]`);
+                diagram.push(`    ${currentId} --> ${nextId}`);
             }
         });
 
         const diagramDefinition = diagram.join('\n');
         container.innerHTML = diagramDefinition;
 
-        // Clear any existing diagrams and render the new one
-        try {
-            mermaid.contentLoaded();
-        } catch (error) {
+        // Render the new diagram
+        mermaid.render('mermaid-svg', diagramDefinition).then(result => {
+            container.innerHTML = result.svg;
+        }).catch(error => {
             console.error('Mermaid rendering error:', error);
             container.innerHTML = `
                 <div class="error-message">
                     Error rendering process diagram: ${error.message}
                 </div>
             `;
-        }
-    }
-
-    // Update the checkMermaidStatus function
-    function checkMermaidStatus() {
-        if (typeof mermaid === 'undefined') {
-            console.error('Mermaid is not loaded!');
-            return false;
-        }
-        // Remove the version check and just verify mermaid is available
-        return true;
+        });
     }
 
     function showBottlenecks(bottlenecks) {
-        // Implementation remains the same
+        bottlenecksDiv.innerHTML = '<h2>Bottlenecks</h2>';
+        
+        if (bottlenecks.identified && bottlenecks.issues) {
+            const list = document.createElement('ul');
+            bottlenecks.issues.forEach(issue => {
+                const item = document.createElement('li');
+                item.textContent = issue;
+                list.appendChild(item);
+            });
+            bottlenecksDiv.appendChild(list);
+        } else {
+            bottlenecksDiv.innerHTML += '<p>No bottlenecks identified.</p>';
+        }
     }
 
     function showOptimization(optimization) {
-        // Implementation remains the same
+        optimizationDiv.innerHTML = '<h2>Optimization Suggestions</h2>';
+        
+        if (optimization.suggestions && optimization.suggestions.length > 0) {
+            const list = document.createElement('ul');
+            optimization.suggestions.forEach(suggestion => {
+                const item = document.createElement('li');
+                item.textContent = suggestion;
+                list.appendChild(item);
+            });
+            optimizationDiv.appendChild(list);
+        } else {
+            optimizationDiv.innerHTML += '<p>No optimization suggestions available.</p>';
+        }
     }
 });
 
