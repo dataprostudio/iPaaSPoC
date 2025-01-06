@@ -73,19 +73,25 @@ app.post('/generate', upload.single('file'), (req, res) => {
             status: 'success',
             file: req.file.filename,
             nodes: [
-                { id: 1, label: 'Start', x: 50, y: 50 },
-                { id: 2, label: 'Process', x: 200, y: 50 },
-                { id: 3, label: 'End', x: 350, y: 50 }
+                { id: 1, label: 'Start', x: 0, y: 0 },
+                { id: 2, label: 'Process', x: 100, y: 0 },
+                { id: 3, label: 'End', x: 200, y: 0 }
             ],
             edges: [
                 { from: 1, to: 2 },
                 { from: 2, to: 3 }
-            ]
+            ],
+            bottlenecks: ['Sample bottleneck 1', 'Sample bottleneck 2'],
+            optimization: 'Sample optimization suggestion'
         });
 
     } catch (error) {
         console.error('Upload error:', error);
-        res.status(500).json({ error: 'Error processing file' });
+        res.status(500).json({
+            success: false,
+            error: 'File upload failed',
+            details: error.message
+        });
     }
 });
 

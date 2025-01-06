@@ -1,78 +1,273 @@
-<!DOCTYPE html> 
-<html lang="en"> 
-<head> 
-    <meta charset="UTF-8"> 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-    <title>NX8020™ - Process Optimizer</title> 
-    <script src="https://cdn.tailwindcss.com"></script> 
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.2.3/dist/mermaid.min.js"></script>
-    <style> 
-        .mermaid { 
-            background-color: white; 
-            padding: 20px; 
-            border-radius: 8px; 
-            margin: 20px 0; 
-        } 
-    </style> 
-</head> 
-<body class="bg-gray-100"> 
-    <div class="container mx-auto px-4 py-8"> 
-        <h1 class="text-4xl font-bold mb-8 text-center">NX8020™ - Process Optimizer</h1> 
-         
-        <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4"> 
-            <div class="mb-6"> 
-                <h2 class="text-2xl font-semibold mb-4">Data Input Options</h2> 
-                <div class="flex flex-col md:flex-row gap-4"> 
-                    <div class="flex-1"> 
-                        <h3 class="text-lg font-medium mb-2">Upload CRM/ERP Log Files</h3> 
-                        <input type="file" id="fileInput" multiple class="hidden" /> 
-                        <label for="fileInput" class="cursor-pointer bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-block"> 
-                            Choose Files 
-                        </label> 
-                        <div id="fileList" class="mt-2 text-sm text-gray-600"></div> 
-                    </div> 
-                    <div class="flex-1"> 
-                        <h3 class="text-lg font-medium mb-2">Stream Data</h3> 
-                        <select id="streamSource" class="block w-full bg-gray-200 border border-gray-200 text-gray-700 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-white focus:border-gray-500"> 
-                            <option value="">Select a data source</option> 
-                            <option value="salesforce">Salesforce</option> 
-                            <option value="sap">SAP</option> 
-                            <option value="oracle">Oracle</option> 
-                        </select> 
-                    </div> 
-                </div> 
-            </div> 
-             
-            <div class="flex items-center justify-center"> 
-                <button id="analyzeButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"> 
-                    Analyze and Optimize 
-                </button> 
-            </div> 
-        </div> 
- 
-        <div id="result" class="mt-8"></div>
-        <div id="processFlow" class="mt-8">
-            <div id="mermaidContainer" class="mermaid"></div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NX8020™ Process Optimizer</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link href="https://unpkg.com/vis-network/styles/vis-network.min.css" rel="stylesheet" type="text/css" />
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 200px;
+            background-color: #2563EB;
+            padding: 20px;
+        }
+        .sidebar-title {
+            color: #FFFFFF;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .sidebar-menu {
+            list-style-type: none;
+            padding: 0;
+        }
+        .sidebar-menu li {
+            margin-bottom: 10px;
+        }
+        .sidebar-menu a {
+            color: #FFFFFF;
+            text-decoration: none;
+            font-size: 16px;
+            display: block;
+            padding: 10px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .sidebar-menu a:hover, .sidebar-menu a.active {
+            background-color: #1E40AF;
+        }
+        .main-content {
+            flex-grow: 1;
+            padding: 40px;
+            background: linear-gradient(to bottom, #EBF4FF, #FFFFFF);
+        }
+        h1 {
+            color: #1E3A8A;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .card-header {
+            background-color: #F3F4F6;
+            padding: 15px 20px;
+            border-bottom: 1px solid #E5E7EB;
+        }
+        .card-title {
+            margin: 0;
+            color: #111827;
+            font-size: 18px;
+        }
+        .card-content {
+            padding: 20px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #374151;
+        }
+        input[type="text"],
+        input[type="password"],
+        input[type="file"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #D1D5DB;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .button {
+            background-color: #3B82F6;
+            color: #FFFFFF;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #2563EB;
+        }
+        .file-upload, .real-time-data {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .file-upload input[type="file"], .real-time-data select {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        #visualization-container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2 class="sidebar-title">Process Mining</h2>
+        <ul class="sidebar-menu">
+            <li><a href="#data" class="active" onclick="showTab('data')">Data</a></li>
+            <li><a href="#visualization" onclick="showTab('visualization')">Visualization</a></li>
+            <li><a href="#analysis" onclick="showTab('analysis')">Analysis</a></li>
+            <li><a href="#simulation" onclick="showTab('simulation')">Simulation</a></li>
+        </ul>
+    </div>
+    <div class="main-content">
+        <div id="data" class="tab-content active">
+            <h1>Data Input</h1>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">File Upload</h2>
+                </div>
+                <div class="card-content">
+                    <div class="file-upload">
+                        <input type="file" id="file-upload" name="file-upload">
+                        <button class="button" onclick="uploadFile()">Upload File</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Real Time Data</h2>
+                </div>
+                <div class="card-content">
+                    <div class="real-time-data">
+                        <select id="crm-erp-system">
+                            <option value="salesforce">Salesforce</option>
+                            <option value="sap">SAP</option>
+                            <option value="oracle">Oracle</option>
+                            <option value="netsuite">NetSuite</option>
+                            <option value="dynamics">Dynamics</option>
+                        </select>
+                        <button class="button" onclick="connectCRM()">Connect</button>
+                    </div>
+                    <div class="input-group">
+                        <label for="api-key">API Key</label>
+                        <input type="password" id="api-key" name="api-key" placeholder="Enter API Key">
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="bottlenecks" class="mt-8"></div>
-        <div id="optimization" class="mt-8"></div>
-    </div> 
- 
-    <script src="app.js"></script>
-    <script src="script.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            mermaid.initialize({ 
-                startOnLoad: false,
-                theme: 'default', 
-                securityLevel: 'loose', 
-                flowchart: { 
-                    htmlLabels: true, 
-                    curve: 'basis' 
-                } 
-            });
-        });
-    </script>
-</body> 
-</html>
+        <div id="visualization" class="tab-content">
+            <h1>Visualization</h1>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Process Flow</h2>
+                </div>
+                <div class="card-content">
+                    <div id="visualization-container"></div>
+                </div>
+            </div>
+        </div>
+        <div id="analysis" class="tab-content">
+            <h1>Analysis</h1>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Process Analysis</h2>
+                </div>
+                <div class="card-content">
+                    <div id="analysis-content"></div>
+                </div>
+            </div>
+        </div>
+        <div id="simulation" class="tab-content">
+            <h1>Simulation</h1>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Process Simulation</h2>
+                </div>
+                <div class="card-content">
+                    <p>Simulation features coming soon.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <script src="{{ url_for('static', filename='js/visualization.js') }}"></script>
+    <script>
+        function uploadFile() {
+            const fileInput = document.getElementById('file-upload');
+            const file = fileInput.files[0];
+            if (file) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                fetch('/generate', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Success:', data);
+                    showTab('visualization');
+                    if (window.visualizer) {
+                        window.visualizer.createVisualization(data);
+                    }
+                    document.getElementById('analysis-content').innerHTML = `
+                        <h3>Bottlenecks:</h3>
+                        <ul>
+                            ${data.bottlenecks.map(b => `<li>${b}</li>`).join('')}
+                        </ul>
+                        <h3>Optimization Suggestions:</h3>
+                        <p>${data.optimization}</p>
+                    `;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error uploading file');
+                });
+            } else {
+                alert('Please select a file to upload');
+            }
+        }
+
+        function connectCRM() {
+            const crmSystem = document.getElementById('crm-erp-system').value;
+            const apiKey = document.getElementById('api-key').value;
+            if (crmSystem && apiKey) {
+                console.log('Connecting to:', crmSystem);
+            } else {
+                alert('Please select a system and enter the API Key');
+            }
+        }
+
+        function showTab(tabId) {
+            console.log('Switching to', tabId, 'tab');
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(tabId).classList.add('active');
+            document.querySelectorAll('.sidebar-menu a').forEach(link => {
+                link.classList.remove('active');
+            });
+            document.querySelector(`.sidebar-menu a[href="#${tabId}"]`).classList.add('active');
+        }
+    </script>
+</body>
+</html> 
