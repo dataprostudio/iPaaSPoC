@@ -6,30 +6,29 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import http from 'http';
 import fs from 'fs';
-import os from 'os';
+import fetch from 'node-fetch';
 
 dotenv.config();
 
-// Get __dirname equivalent in ES modules
+// ES6 __dirname setup
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Add uploads directory check
-const ensureUploadsDir = () => {
-    const uploadDir = join(__dirname, '../uploads');
-    if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    return uploadDir;
-};
+// Hugging Face configuration
+const HUGGING_FACE_API_TOKEN = process.env.HUGGING_FACE_API_TOKEN;
+const MODEL_API_URL = "https://api-inference.huggingface.co/models/bartowski/Llama-3.2-1B-Instruct-GGUF";
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, ensureUploadsDir())
+        const uploadDir = join(__dirname, '../uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname)
+        cb(null, Date.now() + '-' + file.originalname);
     }
 });
 
@@ -42,36 +41,63 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(join(__dirname, '../public')));
 
-// Serve static files with proper MIME types
-app.use(express.static(join(__dirname, '../public'), {
-    setHeaders: (res, path) => {
-        if (path.endsWith('.js')) {
-            res.setHeader('Content-Type', 'application/javascript');
-        }
+// Request logging middleware
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+});
+
+// Function to query Llama 3.2
+async function queryLlama(content) {
+    const response = await fetch(MODEL_API_URL, {
+        headers: { 
+            "Authorization": `Bearer ${HUGGING_FACE_API_TOKEN}`,
+            "Content-Type": "application/json"
+        },
+        method: "POST",
+        body: JSON.stringify({
+            inputs: `<s>[INST] Analyze this business process and identify bottlenecks and optimization opportunities: ${content} [/INST]`,
+            parameters: {
+                max_length: 1000,
+                temperature: 0.7,
+                top_p: 0.95,
+                return_full_text: false
+            }
+        }),
+    });
+    
+    if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
     }
-}));
+    
+    return response.json();
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'healthy' });
 });
 
-// File upload endpoint
-app.post('/generate', upload.single('file'), (req, res) => {
+// File upload and analysis endpoint
+app.post('/generate', upload.single('file'), async (req, res) => {
     console.log('Upload request received');
     try {
         if (!req.file) {
-            console.log('No file in request');
             return res.status(400).json({ error: 'No file uploaded' });
         }
         
         console.log('File received:', req.file);
 
-        // Send back visualization data
-        res.json({
-            status: 'success',
-            file: req.file.filename,
+        // Read file content
+        const fileContent = fs.readFileSync(req.file.path, 'utf8');
+        
+        // Query Llama 3.2 for analysis
+        const analysis = await queryLlama(fileContent);
+        
+        // Process the analysis response
+        const results = {
             nodes: [
                 { id: 1, label: 'Start', x: 50, y: 50 },
                 { id: 2, label: 'Process', x: 200, y: 50 },
@@ -80,75 +106,42 @@ app.post('/generate', upload.single('file'), (req, res) => {
             edges: [
                 { from: 1, to: 2 },
                 { from: 2, to: 3 }
-            ]
+            ],
+            bottlenecks: analysis.bottlenecks || ['Analyzing process...'],
+            recommendations: analysis.recommendations || ['Generating recommendations...']
+        };
+
+        res.json({
+            status: 'success',
+            file: req.file.filename,
+            ...results
         });
 
     } catch (error) {
-        console.error('Upload error:', error);
+        console.error('Processing error:', error);
         res.status(500).json({ error: 'Error processing file' });
     }
 });
 
-// AWS connectivity check
-const checkAWSConnectivity = async () => {
-    try {
-        const AWS_DOMAIN = process.env.AWS_DOMAIN || 'aws.amazon.com';
-        const response = await fetch(`https://${AWS_DOMAIN}`);
-        if (response.ok) {
-            console.log('AWS connectivity: OK');
-        } else {
-            console.warn('AWS connectivity: Failed');
-        }
-    } catch (error) {
-        console.error('AWS connectivity check failed:', error);
-    }
-};
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+});
 
-// Start server function
-const startServer = async () => {
-    try {
-        const PORT = process.env.PORT || 3000;
-        
-        // Create HTTP server
-        const server = http.createServer(app);
-        
-        // Start listening
-        server.listen(PORT, () => {
-            console.log(`Server running on port ${PORT}`);
-            console.log('----------------------------------------');
-            console.log('Server Configuration:');
-            console.log(`1. Port: ${PORT}`);
-            console.log(`2. Environment: ${process.env.NODE_ENV || 'development'}`);
-            console.log(`3. Platform: ${os.platform()}`);
-            console.log('----------------------------------------');
-            
-            // Log important paths
-            console.log('Directory Configuration:');
-            console.log(`1. Static files: ${join(__dirname, '../public')}`);
-            console.log(`2. Uploads: ${join(__dirname, '../uploads')}`);
-            console.log('----------------------------------------');
+// Start server
+const PORT = process.env.PORT || 3000;
+const server = http.createServer(app);
 
-            checkAWSConnectivity();
-        });
-
-        // Error handling for the server
-        server.on('error', (error) => {
-            console.error('Server error:', error);
-            if (error.code === 'EADDRINUSE') {
-                console.error(`Port ${PORT} is already in use`);
-            }
-        });
-
-    } catch (error) {
-        console.error('Server startup failed:', error);
-        process.exit(1);
-    }
-};
-
-// Start the server
-startServer().catch(error => {
-    console.error('Failed to start server:', error);
-    process.exit(1);
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log('----------------------------------------');
+    console.log('Server Configuration:');
+    console.log(`1. Port: ${PORT}`);
+    console.log(`2. Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`3. Static files: ${join(__dirname, '../public')}`);
+    console.log(`4. Uploads directory: ${join(__dirname, '../uploads')}`);
+    console.log('----------------------------------------');
 });
 
 export default app;
