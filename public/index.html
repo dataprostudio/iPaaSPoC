@@ -181,7 +181,9 @@
                     <h2 class="card-title">Process Flow</h2>
                 </div>
                 <div class="card-content">
-                    <div id="visualization-container"></div>
+                    <div id="visualization-container">
+                        <canvas id="visualizer"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -209,42 +211,46 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/visualization.js') }}"></script>
+    <script src="/static/js/visualization.js"></script>
     <script>
         function uploadFile() {
             const fileInput = document.getElementById('file-upload');
             const file = fileInput.files[0];
-            if (file) {
-                const formData = new FormData();
-                formData.append('file', file);
-
-                fetch('/generate', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Success:', data);
-                    showTab('visualization');
-                    if (window.visualizer) {
-                        window.visualizer.createVisualization(data);
-                    }
-                    document.getElementById('analysis-content').innerHTML = `
-                        <h3>Bottlenecks:</h3>
-                        <ul>
-                            ${data.bottlenecks.map(b => `<li>${b}</li>`).join('')}
-                        </ul>
-                        <h3>Optimization Suggestions:</h3>
-                        <p>${data.optimization}</p>
-                    `;
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error uploading file');
-                });
-            } else {
+            
+            if (!file) {
                 alert('Please select a file to upload');
+                return;
             }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/generate', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Upload failed');
+                }
+                
+                console.log('Success:', data);
+                showTab('visualization');
+                
+                if (window.visualizer) {
+                    window.visualizer.createVisualization(data);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error uploading file: ' + error.message);
+            });
         }
 
         function connectCRM() {

@@ -8,10 +8,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({
+    dest: 'uploads/',
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    }
+});
 
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/static', express.static('public/static'));
 
 app.post('/upload-and-analyze', upload.array('files'), (req, res) => {
     // Handle file upload and analysis
@@ -47,7 +53,45 @@ app.post('/generate-text', (req, res) => {
     res.json({ generatedText });
 });
 
+// Add file upload endpoint
+app.post('/generate', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            throw new Error('No file uploaded');
+        }
+        
+        // Sample workflow data
+        const fileData = {
+            nodes: [
+                { id: 1, label: 'Start Process' },
+                { id: 2, label: 'Review' },
+                { id: 3, label: 'Approve' }
+            ],
+            edges: [
+                { from: 1, to: 2 },
+                { from: 2, to: 3 }
+            ]
+        };
+        
+        // Send response with data structure
+        res.json({
+            success: true,
+            message: 'File uploaded successfully',
+            filename: req.file.filename,
+            data: fileData,
+            bottlenecks: [], // Empty array for now
+            optimization: 'No optimization suggestions yet.' // Default message
+        });
+    } catch (error) {
+        console.error('Upload error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
