@@ -1,89 +1,97 @@
 import express from 'express';
 import multer from 'multer';
-import bodyParser from 'body-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import fs from 'fs/promises';
+import { spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = dirname(__filename);
 
 const app = express();
+
+// Configure multer for file uploads
 const upload = multer({
     dest: 'uploads/',
     limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB limit
+        fileSize: 5 * 1024 * 1024
     }
 });
 
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 app.use('/static', express.static('public/static'));
 
-app.post('/upload-and-analyze', upload.array('files'), (req, res) => {
-    // Handle file upload and analysis
-    const files = req.files;
-    console.log('Files uploaded:', files);
+async function processWithPythonModel(input) {
+    return new Promise((resolve, reject) => {
+        console.log('Starting Python process...');
+        const pythonPath = 'D:\\Program Files\\Python\\Python312\\python.exe';
+        const pythonProcess = spawn(pythonPath, ['model_service.py'], {
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+        
+        let outputData = '';
+        let errorData = '';
 
-    // Simulate analysis
-    const analysisResult = {
-        processFlow: ['Step 1', 'Step 2', 'Step 3'],
-        bottlenecks: ['Bottleneck 1', 'Bottleneck 2'],
-        optimization: 'Optimization suggestion here'
-    };
+        pythonProcess.stdout.on('data', (data) => {
+            console.log('Python stdout:', data.toString());
+            outputData += data.toString();
+        });
 
-    res.json(analysisResult);
-});
+        pythonProcess.stderr.on('data', (data) => {
+            console.error('Python stderr:', data.toString());
+            errorData += data.toString();
+        });
 
-app.get('/llm-status', (req, res) => {
-    // Check LLM status
-    const status = {
-        available: true,
-        modelPath: '/path/to/your/model',
-        error: null,
-        downloadInstructions: null
-    };
+        pythonProcess.on('error', (error) => {
+            console.error('Failed to start Python process:', error);
+            reject(error);
+        });
 
-    res.json(status);
-});
+        pythonProcess.on('close', (code) => {
+            console.log(`Python process exited with code ${code}`);
+            if (code !== 0) {
+                reject(new Error(`Python process failed: ${errorData}`));
+                return;
+            }
+            try {
+                const result = JSON.parse(outputData);
+                if (result.error) {
+                    reject(new Error(result.error));
+                    return;
+                }
+                resolve(result);
+            } catch (error) {
+                reject(new Error(`Failed to parse Python output: ${error.message}\nOutput: ${outputData}`));
+            }
+        });
 
-app.post('/generate-text', (req, res) => {
-    const prompt = req.body.prompt;
-    // Simulate text generation
-    const generatedText = `Generated text for prompt: ${prompt}`;
-    res.json({ generatedText });
-});
+        // Send input to Python script
+        pythonProcess.stdin.write(input);
+        pythonProcess.stdin.end();
+    });
+}
 
-// Add file upload endpoint
 app.post('/generate', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             throw new Error('No file uploaded');
         }
-        
-        // Sample workflow data
-        const fileData = {
-            nodes: [
-                { id: 1, label: 'Start Process' },
-                { id: 2, label: 'Review' },
-                { id: 3, label: 'Approve' }
-            ],
-            edges: [
-                { from: 1, to: 2 },
-                { from: 2, to: 3 }
-            ]
-        };
-        
-        // Send response with data structure
+
+        const fileContent = await fs.readFile(req.file.path, 'utf8');
+        const processData = await processWithPythonModel(fileContent);
+
         res.json({
             success: true,
-            message: 'File uploaded successfully',
+            message: 'File processed successfully',
             filename: req.file.filename,
-            data: fileData,
-            bottlenecks: [], // Empty array for now
-            optimization: 'No optimization suggestions yet.' // Default message
+            data: processData,
+            bottlenecks: [],
+            optimization: 'Processed with Hugging Face Transformers'
         });
+
     } catch (error) {
-        console.error('Upload error:', error);
+        console.error('Processing error:', error);
         res.status(500).json({
             success: false,
             error: error.message
