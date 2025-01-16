@@ -50,25 +50,134 @@ class WorkflowVisualizer {
 
     createVisualization(data) {
         console.log('Creating visualization with data:', data);
-        if (!this.ctx || !this.canvas) {
-            console.error('No canvas or context');
-            return;
-        }
-
-        this.lastData = data;
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
-        if (!data?.data?.nodes) {
-            console.error('Invalid data structure:', data);
-            return;
-        }
+        const analysisText = data.analysis || '';
+        
+        // Create nodes with tooltips - store in a persistent variable
+        const nodes = new vis.DataSet([
+            { id: 1, label: 'Start', shape: 'box' },
+            { 
+                id: 2, 
+                label: 'Process', 
+                shape: 'box',
+                title: 'Click for analysis'
+            }
+        ]);
 
-        // Debug: Draw background to verify canvas is working
-        this.ctx.fillStyle = '#f0f0f0';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        const edges = new vis.DataSet([
+            { from: 1, to: 2 }
+        ]);
 
-        this.drawEdges(data.data.edges);
-        this.drawNodes(data.data.nodes);
+        const container = document.getElementById('visualization');
+        const networkData = { nodes, edges };
+        
+        const options = {
+            nodes: {
+                shape: 'box',
+                margin: 10,
+                shadow: true,
+                color: {
+                    background: '#ffffff',
+                    border: '#2B7CE9'
+                },
+                font: { size: 16 }
+            },
+            edges: {
+                width: 2,
+                color: '#2B7CE9'
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 200,
+                dragNodes: true,
+                dragView: true
+            },
+            physics: {
+                enabled: true,
+                barnesHut: {
+                    gravitationalConstant: -2000,
+                    centralGravity: 0.3,
+                    springLength: 200
+                },
+                stabilization: {
+                    iterations: 50
+                }
+            }
+        };
+
+        // Create network instance
+        const network = new vis.Network(container, networkData, options);
+        
+        // Store network instance
+        window.currentNetwork = network;
+
+        network.on('click', function(params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                if (nodeId === 2) {
+                    const existingPopup = document.getElementById('node-details');
+                    if (existingPopup) {
+                        existingPopup.remove();
+                    }
+
+                    const popup = document.createElement('div');
+                    popup.id = 'node-details';
+
+                    popup.innerHTML = `
+                        <div class="header">
+                            <button class="close-button" 
+                                    onclick="document.getElementById('node-details').remove()">✖</button>
+                            <h3>Process Analysis</h3>
+                        </div>
+                        <div class="content">
+                            ${analysisText.split('\n').map(line => 
+                                line.trim().startsWith('*') ? 
+                                `<li>${line.substring(1)}</li>` : 
+                                `<p>${line}</p>`
+                            ).join('')}
+                        </div>
+                    `;
+
+                    document.body.appendChild(popup);
+
+                    // Make popup draggable
+                    let isDragging = false;
+                    let currentX;
+                    let currentY;
+                    let initialX;
+                    let initialY;
+
+                    popup.addEventListener('mousedown', dragStart);
+                    document.addEventListener('mousemove', drag);
+                    document.addEventListener('mouseup', dragEnd);
+
+                    function dragStart(e) {
+                        initialX = e.clientX - popup.offsetLeft;
+                        initialY = e.clientY - popup.offsetTop;
+                        if (e.target === popup) {
+                            isDragging = true;
+                        }
+                    }
+
+                    function drag(e) {
+                        if (isDragging) {
+                            e.preventDefault();
+                            currentX = e.clientX - initialX;
+                            currentY = e.clientY - initialY;
+                            popup.style.left = currentX + 'px';
+                            popup.style.top = currentY + 'px';
+                            popup.style.transform = 'none';
+                        }
+                    }
+
+                    function dragEnd() {
+                        isDragging = false;
+                    }
+                }
+            }
+        });
+
+        return network;
     }
 
     drawNodes(nodes) {
@@ -152,5 +261,71 @@ function switchTab(tabName) {
     if (selectedTab) {
         selectedTab.classList.add('active');
         selectedTab.style.display = 'block';
+    }
+}
+
+// Update the Process Analysis section within the Analysis tab
+function updateAnalysis(analysisText) {
+    console.log('Analysis text received:', analysisText); 
+    
+    // Function to update content when tab is ready
+    const updateContent = () => {
+        // Try to find the analysis content area in the bundled structure
+        const analysisContent = document.querySelector('[data-tab="analysis"] .process-analysis') ||
+                              document.querySelector('.analysis-content-wrapper');
+        
+        if (analysisContent) {
+            console.log('Found analysis content area');
+            analysisContent.innerHTML = `
+                <div class="analysis-text">
+                    ${analysisText.split('\n').map(line => `<p>${line}</p>`).join('')}
+                </div>
+            `;
+            console.log('Analysis content updated');
+        } else {
+            console.error('Analysis content area not found');
+        }
+    };
+
+    // Wait for tab switch and content initialization
+    setTimeout(updateContent, 200);
+}
+
+async function uploadFile() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    if (!file) {
+        alert('Please select a file first');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/generate', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+
+        const data = await response.json();
+        if (data.success) {
+            // Update visualization
+            window.visualizer.drawWorkflow(data.data);
+            
+            // Update analysis in your existing tab
+            if (data.analysis) {
+                updateAnalysis(data.analysis);
+            }
+        } else {
+            throw new Error(data.error || 'Unknown error');
+        }
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        alert('Error uploading file: ' + error.message);
     }
 }
