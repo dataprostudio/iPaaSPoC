@@ -53,7 +53,7 @@ class WorkflowVisualizer {
         
         const analysisText = data.analysis || '';
         
-        // Create nodes with tooltips - store in a persistent variable
+        // Create nodes with tooltips
         const nodes = new vis.DataSet([
             { id: 1, label: 'Start', shape: 'box' },
             { 
@@ -105,21 +105,15 @@ class WorkflowVisualizer {
             }
         };
 
-        // Create network instance
+        // Create and store network instance
         const network = new vis.Network(container, networkData, options);
-        
-        // Store network instance
         window.currentNetwork = network;
 
-        network.on('click', function(params) {
-            if (params.nodes.length > 0) {
-                const nodeId = params.nodes[0];
-                if (nodeId === 2) {
-                    const existingPopup = document.getElementById('node-details');
-                    if (existingPopup) {
-                        existingPopup.remove();
-                    }
-
+        // Handle node clicks and analysis display
+        network.on('click', async function(params) {
+            if (params.nodes.length > 0 && params.nodes[0] === 2) {
+                try {
+                    // Create popup for analysis
                     const popup = document.createElement('div');
                     popup.id = 'node-details';
 
@@ -173,6 +167,8 @@ class WorkflowVisualizer {
                     function dragEnd() {
                         isDragging = false;
                     }
+                } catch (error) {
+                    console.error('Error displaying analysis:', error);
                 }
             }
         });

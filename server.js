@@ -18,37 +18,40 @@ const upload = multer({
 
 app.use(express.static('public'));
 
-async function processWithOllama(input) {
+// Function to process with Gradio
+async function processWithGradio(input) {
     try {
-        console.log('Sending request to Ollama API...');
-        const response = await fetch('http://localhost:11434/api/generate', {
+        console.log('Connecting to Gradio...');
+        const response = await fetch('http://127.0.0.1:7860/run/predict', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: "custom-model",
-                prompt: `Analyze this process and extract workflow nodes and connections:\n${input}`,
-                stream: false
+                fn_index: 0,
+                data: [input],
+                session_hash: Date.now().toString()
             })
         });
 
-        const data = await response.json();
-        console.log('Raw Ollama response:', data);
+        if (!response.ok) {
+            console.error('Gradio response not OK:', response.status);
+            const errorText = await response.text();
+            console.error('Error details:', errorText);
+            throw new Error(`Gradio API error: ${response.statusText}`);
+        }
 
-        return {
-            analysis: data.response,
-            workflow: {
-                nodes: [
-                    { id: 1, label: "Start" },
-                    { id: 2, label: data.response.slice(0, 50) }
-                ],
-                edges: [{ from: 1, to: 2 }]
-            }
-        };
+        const data = await response.json();
+        console.log('Gradio response received:', data);
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        return data.data ? data.data[0] : 'No response from model';
     } catch (error) {
-        console.error('Detailed Ollama error:', error);
-        throw error;
+        console.error('Detailed Gradio error:', error);
+        throw new Error(`Failed to connect to Gradio: ${error.message}`);
     }
 }
 
@@ -59,18 +62,26 @@ app.post('/generate', upload.single('file'), async (req, res) => {
         }
 
         const fileContent = await fs.readFile(req.file.path, 'utf8');
-        console.log('File content received:', fileContent.slice(0, 100) + '...');
-        console.log('Processing with Ollama...');
+        console.log('Processing with Gradio...');
         
-        const result = await processWithOllama(fileContent);
-        console.log('Analysis content:', result.analysis);
+        const response = await processWithGradio(fileContent);
+        console.log('Gradio response received');
+
+        const workflow_data = {
+            nodes: [
+                { id: 1, label: "Start" },
+                { id: 2, label: response.slice(0, 50) }
+            ],
+            edges: [
+                { from: 1, to: 2 }
+            ]
+        };
 
         res.json({
             success: true,
             message: 'File processed successfully',
-            data: result.workflow,
-            analysis: result.analysis,
-            rawResponse: result
+            data: workflow_data,
+            analysis: response
         });
 
     } catch (error) {
