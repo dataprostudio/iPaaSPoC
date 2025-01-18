@@ -17,17 +17,12 @@ class WorkflowVisualizer {
                 throw new Error('Failed to get canvas context');
             }
 
-            // Set explicit dimensions
             const container = document.getElementById('visualization-container');
             if (container) {
                 this.canvas.width = container.clientWidth || 800;
                 this.canvas.height = container.clientHeight || 600;
-                console.log('Canvas dimensions:', this.canvas.width, 'x', this.canvas.height);
             }
 
-            // Debug: Add border to see canvas
-            this.canvas.style.border = '1px solid red';
-            
             window.addEventListener('resize', () => this.resizeCanvas());
             console.log('Canvas initialized successfully');
         } catch (error) {
@@ -51,142 +46,67 @@ class WorkflowVisualizer {
     createVisualization(data) {
         console.log('Creating visualization with data:', data);
         
-        const analysisText = data.analysis || '';
-        
-        // Create nodes with tooltips
-        const nodes = new vis.DataSet([
-            { id: 1, label: 'Start', shape: 'box' },
-            { 
-                id: 2, 
-                label: 'Process', 
-                shape: 'box',
-                title: 'Click for analysis'
-            }
-        ]);
-
-        const edges = new vis.DataSet([
-            { from: 1, to: 2 }
-        ]);
-
-        const container = document.getElementById('visualization');
-        const networkData = { nodes, edges };
-        
-        const options = {
-            nodes: {
-                shape: 'box',
-                margin: 10,
-                shadow: true,
-                color: {
-                    background: '#ffffff',
-                    border: '#2B7CE9'
-                },
-                font: { size: 16 }
-            },
-            edges: {
-                width: 2,
-                color: '#2B7CE9'
-            },
-            interaction: {
-                hover: true,
-                tooltipDelay: 200,
-                dragNodes: true,
-                dragView: true
-            },
-            physics: {
-                enabled: true,
-                barnesHut: {
-                    gravitationalConstant: -2000,
-                    centralGravity: 0.3,
-                    springLength: 200
-                },
-                stabilization: {
-                    iterations: 50
+        if (!window.networkInstance) {
+            const nodes = new vis.DataSet([
+                { id: 1, label: 'Start', shape: 'box' },
+                { 
+                    id: 2, 
+                    label: 'Process', 
+                    shape: 'box',
+                    title: 'Click for analysis'
                 }
-            }
-        };
+            ]);
 
-        // Create and store network instance
-        const network = new vis.Network(container, networkData, options);
-        window.currentNetwork = network;
+            const edges = new vis.DataSet([
+                { from: 1, to: 2 }
+            ]);
 
-        // Handle node clicks and analysis display
-        network.on('click', async function(params) {
-            if (params.nodes.length > 0 && params.nodes[0] === 2) {
-                try {
-                    // Create popup for analysis
-                    const popup = document.createElement('div');
-                    popup.id = 'node-details';
-
-                    popup.innerHTML = `
-                        <div class="header">
-                            <button class="close-button" 
-                                    onclick="document.getElementById('node-details').remove()">✖</button>
-                            <h3>Process Analysis</h3>
-                        </div>
-                        <div class="content">
-                            ${analysisText.split('\n').map(line => 
-                                line.trim().startsWith('*') ? 
-                                `<li>${line.substring(1)}</li>` : 
-                                `<p>${line}</p>`
-                            ).join('')}
-                        </div>
-                    `;
-
-                    document.body.appendChild(popup);
-
-                    // Make popup draggable
-                    let isDragging = false;
-                    let currentX;
-                    let currentY;
-                    let initialX;
-                    let initialY;
-
-                    popup.addEventListener('mousedown', dragStart);
-                    document.addEventListener('mousemove', drag);
-                    document.addEventListener('mouseup', dragEnd);
-
-                    function dragStart(e) {
-                        initialX = e.clientX - popup.offsetLeft;
-                        initialY = e.clientY - popup.offsetTop;
-                        if (e.target === popup) {
-                            isDragging = true;
-                        }
-                    }
-
-                    function drag(e) {
-                        if (isDragging) {
-                            e.preventDefault();
-                            currentX = e.clientX - initialX;
-                            currentY = e.clientY - initialY;
-                            popup.style.left = currentX + 'px';
-                            popup.style.top = currentY + 'px';
-                            popup.style.transform = 'none';
-                        }
-                    }
-
-                    function dragEnd() {
-                        isDragging = false;
-                    }
-                } catch (error) {
-                    console.error('Error displaying analysis:', error);
+            const container = document.getElementById('visualization');
+            const networkData = { nodes, edges };
+            
+            const options = {
+                nodes: {
+                    shape: 'box',
+                    margin: 10,
+                    shadow: true,
+                    color: {
+                        background: '#ffffff',
+                        border: '#2B7CE9'
+                    },
+                    font: { size: 16 }
+                },
+                edges: {
+                    width: 2,
+                    color: '#2B7CE9'
                 }
-            }
-        });
+            };
 
-        return network;
+            window.networkInstance = new vis.Network(container, networkData, options);
+        }
+
+        // Update Analysis tab content
+        const analysisTab = document.querySelector('.analysis-tab-content');
+        if (analysisTab && data.analysis) {
+            analysisTab.innerHTML = `
+                <div class="process-analysis">
+                    <h3>Process Analysis</h3>
+                    <div class="analysis-text">
+                        ${data.analysis.split('\n').map(line => 
+                            `<p>${line}</p>`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        return window.networkInstance;
     }
 
     drawNodes(nodes) {
-        console.log('Drawing nodes:', nodes);
-        const startX = 100;
-        const startY = this.canvas.height / 2;
-        const spacing = 200;
-
         nodes.forEach((node, index) => {
-            const x = startX + (index * spacing);
-            const y = startY;
+            const x = 100 + (index * 200);
+            const y = this.canvas.height / 2;
             
-            // Node circle
             this.ctx.beginPath();
             this.ctx.arc(x, y, 40, 0, Math.PI * 2);
             this.ctx.fillStyle = '#4CAF50';
@@ -195,7 +115,6 @@ class WorkflowVisualizer {
             this.ctx.lineWidth = 2;
             this.ctx.stroke();
 
-            // Node label
             this.ctx.fillStyle = 'white';
             this.ctx.font = 'bold 14px Arial';
             this.ctx.textAlign = 'center';
@@ -205,33 +124,18 @@ class WorkflowVisualizer {
     }
 
     drawEdges(edges) {
-        console.log('Drawing edges:', edges);
         if (!edges) return;
 
-        const startX = 100;
-        const startY = this.canvas.height / 2;
-        const spacing = 200;
-
-        this.ctx.strokeStyle = '#2196F3';
-        this.ctx.lineWidth = 2;
-
         edges.forEach(edge => {
-            const fromX = startX + ((edge.from - 1) * spacing);
-            const toX = startX + ((edge.to - 1) * spacing);
-            const y = startY;
+            const fromX = 100 + ((edge.from - 1) * 200);
+            const toX = 100 + ((edge.to - 1) * 200);
+            const y = this.canvas.height / 2;
 
-            // Draw arrow
+            this.ctx.strokeStyle = '#2196F3';
+            this.ctx.lineWidth = 2;
             this.ctx.beginPath();
             this.ctx.moveTo(fromX + 40, y);
             this.ctx.lineTo(toX - 40, y);
-            
-            // Arrowhead
-            const arrowSize = 10;
-            this.ctx.moveTo(toX - 40, y);
-            this.ctx.lineTo(toX - 40 - arrowSize, y - arrowSize);
-            this.ctx.moveTo(toX - 40, y);
-            this.ctx.lineTo(toX - 40 - arrowSize, y + arrowSize);
-            
             this.ctx.stroke();
         });
     }
@@ -244,47 +148,23 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function switchTab(tabName) {
-    console.log('Switching to', tabName, 'tab');
+    // Store current tab
+    localStorage.setItem('currentTab', tabName);
     
-    // Remove active class from all tabs
     document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
-        tab.style.display = 'none';
+        if (tab.id === tabName) {
+            tab.style.display = 'block';
+            tab.classList.add('active');
+        } else {
+            tab.style.display = 'none';
+            tab.classList.remove('active');
+        }
     });
     
-    // Add active class to selected tab
-    const selectedTab = document.getElementById(tabName);
-    if (selectedTab) {
-        selectedTab.classList.add('active');
-        selectedTab.style.display = 'block';
+    // Redraw visualization if switching to its tab
+    if (tabName === 'visualization-tab' && window.networkInstance) {
+        window.networkInstance.redraw();
     }
-}
-
-// Update the Process Analysis section within the Analysis tab
-function updateAnalysis(analysisText) {
-    console.log('Analysis text received:', analysisText); 
-    
-    // Function to update content when tab is ready
-    const updateContent = () => {
-        // Try to find the analysis content area in the bundled structure
-        const analysisContent = document.querySelector('[data-tab="analysis"] .process-analysis') ||
-                              document.querySelector('.analysis-content-wrapper');
-        
-        if (analysisContent) {
-            console.log('Found analysis content area');
-            analysisContent.innerHTML = `
-                <div class="analysis-text">
-                    ${analysisText.split('\n').map(line => `<p>${line}</p>`).join('')}
-                </div>
-            `;
-            console.log('Analysis content updated');
-        } else {
-            console.error('Analysis content area not found');
-        }
-    };
-
-    // Wait for tab switch and content initialization
-    setTimeout(updateContent, 200);
 }
 
 async function uploadFile() {
@@ -309,13 +189,28 @@ async function uploadFile() {
         }
 
         const data = await response.json();
+        console.log('Response data:', data); // Debug log
+
         if (data.success) {
             // Update visualization
-            window.visualizer.drawWorkflow(data.data);
+            window.visualizer.createVisualization(data.data);
             
-            // Update analysis in your existing tab
-            if (data.analysis) {
-                updateAnalysis(data.analysis);
+            // Update analysis tab
+            const analysisTab = document.querySelector('.analysis-tab-content');
+            if (analysisTab) {
+                console.log('Updating analysis tab with:', data.analysis); // Debug log
+                analysisTab.innerHTML = `
+                    <div class="process-analysis">
+                        <h3>Process Analysis</h3>
+                        <div class="analysis-text">
+                            ${data.analysis.split('\n').map(line => 
+                                `<p>${line}</p>`
+                            ).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                console.error('Analysis tab element not found');
             }
         } else {
             throw new Error(data.error || 'Unknown error');
@@ -325,3 +220,37 @@ async function uploadFile() {
         alert('Error uploading file: ' + error.message);
     }
 }
+
+// Add click handler for nodes
+function initializeNodeClickHandler() {
+    if (window.networkInstance) {
+        window.networkInstance.on('click', function(params) {
+            console.log('Node clicked:', params); // Debug log
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const node = window.networkInstance.body.data.nodes.get(nodeId);
+                console.log('Node data:', node); // Debug log
+                
+                // Update analysis tab with node content
+                const analysisTab = document.querySelector('.analysis-tab-content');
+                if (analysisTab) {
+                    analysisTab.innerHTML = `
+                        <div class="process-analysis">
+                            <h3>Node Content</h3>
+                            <div class="analysis-text">
+                                <p>${node.label || 'No content available'}</p>
+                            </div>
+                        </div>
+                    `;
+                    // Make sure analysis tab is visible
+                    switchTab('analysis-tab');
+                }
+            }
+        });
+    }
+}
+
+// Call this after creating visualization
+document.addEventListener('DOMContentLoaded', () => {
+    initializeNodeClickHandler();
+});
