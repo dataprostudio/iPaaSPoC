@@ -1,0 +1,29 @@
+{
+    "training_data": [
+        {
+            "instruction": "Extract process flow from this text:",
+            "input": "The invoice processing starts when accounts receives a bill. They verify the amount, check against purchase orders, then route for approval. If approved, payment is processed. If rejected, it returns to verification.",
+            "output": "Process Flow:\n1. Invoice Receipt\n2. Amount Verification\n3. PO Validation\n4. Approval Routing\n5. Payment Processing\n\nDecision Points:\n- Approval Check (Yes → Payment, No → Verification)\n\nParallel Activities:\n- Amount and PO checks can happen simultaneously"
+        },
+        {
+            "instruction": "Identify process actors and their activities:",
+            "input": "HR initiates onboarding when receiving a signed offer. IT creates accounts while Facilities prepares workspace. Manager assigns initial tasks after IT setup completes.",
+            "output": "Actors and Activities:\n1. HR:\n   - Initiate onboarding\n   - Process signed offer\n2. IT:\n   - Create user accounts\n   - System setup\n3. Facilities:\n   - Workspace preparation\n4. Manager:\n   - Task assignment\n\nDependencies:\n- Manager tasks depend on IT setup\n- Parallel: IT and Facilities work"
+        },
+        {
+            "instruction": "Map system interactions in this process:",
+            "input": "Customer data enters through CRM, triggers ERP inventory check. If stock exists, order management creates shipment in WMS. SAP handles billing after delivery confirmation.",
+            "output": "System Interactions:\n1. CRM → Customer Data Entry\n2. ERP → Inventory Check\n3. WMS → Shipment Management\n4. SAP → Billing\n\nData Flow:\nCustomer Data → Inventory → Order → Shipment → Billing\n\nIntegration Points:\n- CRM to ERP\n- ERP to WMS\n- WMS to SAP"
+        },
+        {
+            "instruction": "Detect process bottlenecks in this description:",
+            "input": "Claims processing takes 2 days for initial review, 5 days for assessment, and up to 10 days for approval. Most delays occur in the approval stage due to missing documents.",
+            "output": "Bottlenecks Identified:\n1. Approval Stage (10 days)\n   - Root cause: Missing documents\n   - Impact: Longest wait time\n2. Assessment Stage (5 days)\n\nRecommendations:\n1. Document checklist before approval\n2. Parallel processing where possible"
+        },
+        {
+            "instruction": "Map data flow between systems:",
+            "input": "Sales data from Salesforce triggers inventory updates in SAP. When stock is low, SAP alerts procurement in Oracle. Monthly, data is consolidated in PowerBI.",
+            "output": "System Integration Map:\n1. Salesforce → SAP\n   - Data: Sales records\n   - Trigger: Real-time\n2. SAP → Oracle\n   - Data: Stock levels\n   - Trigger: Threshold-based\n3. All → PowerBI\n   - Data: Consolidated metrics\n   - Frequency: Monthly"
+        }
+    ]
+} 

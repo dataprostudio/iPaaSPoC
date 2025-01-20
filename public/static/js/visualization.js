@@ -245,3 +245,133 @@ function initializeNodeClickHandler() {
 document.addEventListener('DOMContentLoaded', () => {
     initializeNodeClickHandler();
 });
+
+function displayResults(data) {
+    console.log('Received data for visualization:', data);
+    
+    // Create nodes from LLM analysis
+    const nodes = [];
+    let nodeId = 1;
+    
+    // Add process nodes from LLM analysis
+    if (data.analysis) {
+        // Parse the LLM response to extract process steps
+        const processes = extractProcesses(data.analysis);
+        processes.forEach(process => {
+            nodes.push({
+                id: nodeId,
+                label: process.name,
+                title: process.details,
+                shape: 'box',
+                color: '#97C2FC'
+            });
+            nodeId++;
+        });
+    }
+
+    // Create edges between nodes
+    const edges = [];
+    for (let i = 1; i < nodes.length; i++) {
+        edges.push({ from: i, to: i + 1, arrows: 'to' });
+    }
+
+    const container = document.getElementById('visualization');
+    const options = {
+        nodes: {
+            shape: 'box',
+            margin: 10,
+            widthConstraint: { maximum: 200 },
+            font: { size: 14 }
+        },
+        interaction: {
+            hover: true,
+            tooltipDelay: 0
+        },
+        physics: {
+            enabled: true,
+            hierarchicalRepulsion: {
+                nodeDistance: 150
+            }
+        }
+    };
+
+    // Create network
+    const network = new vis.Network(container, { nodes, edges }, options);
+
+    // Handle node clicks - show detailed modal
+    network.on('click', function(params) {
+        if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0];
+            const node = nodes.find(n => n.id === nodeId);
+            if (node && node.title) {
+                showDetailsModal(node.label, node.title);
+            }
+        }
+    });
+
+    // Update analysis tab
+    updateAnalysisTab(data.analysis);
+}
+
+// Helper function to extract processes from LLM analysis
+function extractProcesses(analysis) {
+    // Split analysis into process steps
+    const processes = [];
+    const lines = analysis.split('\n');
+    
+    let currentProcess = null;
+    
+    lines.forEach(line => {
+        // Look for process indicators (numbers, bullets, etc.)
+        if (line.match(/^\d+\.|\*|\-/)) {
+            if (currentProcess) {
+                processes.push(currentProcess);
+            }
+            currentProcess = {
+                name: line.replace(/^\d+\.|\*|\-/, '').trim(),
+                details: ''
+            };
+        } else if (currentProcess && line.trim()) {
+            currentProcess.details += line.trim() + '\n';
+        }
+    });
+    
+    if (currentProcess) {
+        processes.push(currentProcess);
+    }
+    
+    return processes;
+}
+
+// Show modal with node details
+function showDetailsModal(title, content) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">${title}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <pre>${content}</pre>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+    modal.addEventListener('hidden.bs.modal', () => {
+        modal.remove();
+    });
+}
+
+// Update analysis tab content
+function updateAnalysisTab(analysis) {
+    const analysisContent = document.getElementById('analysisContent');
+    if (analysisContent && analysis) {
+        analysisContent.innerHTML = `<pre>${analysis}</pre>`;
+    }
+}
