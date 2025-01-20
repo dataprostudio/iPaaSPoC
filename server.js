@@ -4,6 +4,9 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import fs from 'fs/promises';
 import fetch from 'node-fetch';
+import { BitsAndBytesConfig } from 'transformers';
+import torch from 'torch';
+import { AutoModelForCausalLM } from 'transformers';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -190,6 +193,21 @@ function parseProcessSteps(response) {
     
     return { nodes, edges };
 }
+
+// Add quantization configuration
+const quantization_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.float16,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True
+)
+
+// Load model with quantization
+const model = AutoModelForCausalLM.from_pretrained(
+    modelName,
+    quantization_config=quantization_config,
+    device_map="auto"
+)
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
