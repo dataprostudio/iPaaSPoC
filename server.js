@@ -17,6 +17,10 @@ const upload = multer({
 });
 
 app.use(express.static('public'));
+app.use(express.json());
+
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000; // 2 seconds
 
 // Function to process with Ollama
 async function processWithOllama(input) {
@@ -87,6 +91,62 @@ app.post('/generate', upload.single('file'), async (req, res) => {
         res.status(500).json({
             success: false,
             error: error.message
+        });
+    }
+});
+
+app.post('/api/generate', upload.single('file'), async (req, res) => {
+    try {
+        console.log('Received upload request');
+        
+        if (!req.file) {
+            console.log('No file received');
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const modelName = req.body.model || 'custom-model';
+        console.log('Using model:', modelName);
+        
+        // Add error handling for file content
+        const fileContent = req.file.buffer.toString('utf-8');
+        if (!fileContent) {
+            throw new Error('Empty file content');
+        }
+        console.log('File content length:', fileContent.length);
+
+        // Modify the Ollama API call
+        console.log('Calling Ollama API with model:', modelName);
+        const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: modelName,
+                prompt: fileContent,  // Send just the content
+                stream: false  // Disable streaming for now
+            })
+        });
+
+        if (!ollamaResponse.ok) {
+            const errorText = await ollamaResponse.text();
+            throw new Error(`Ollama API error: ${ollamaResponse.statusText}. Details: ${errorText}`);
+        }
+
+        const data = await ollamaResponse.json();
+        console.log('Ollama response received');
+
+        res.json({
+            success: true,
+            message: "File processed successfully",
+            data: data
+        });
+
+    } catch (error) {
+        console.error('Error details:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
         });
     }
 });

@@ -163,60 +163,51 @@ function switchTab(tabName) {
     
     // Redraw visualization if switching to its tab
     if (tabName === 'visualization-tab' && window.networkInstance) {
-        window.networkInstance.redraw();
+        setTimeout(() => {
+            window.networkInstance.fit(); // Fit to view
+            window.networkInstance.redraw(); // Force redraw
+            const container = document.getElementById('visualization');
+            if (container) {
+                container.style.height = '600px'; // Set explicit height
+                window.networkInstance.setSize('100%', '600px');
+            }
+        }, 100); // Small delay to ensure DOM is ready
     }
 }
 
 async function uploadFile() {
-    const fileInput = document.getElementById('fileInput');
-    const file = fileInput.files[0];
-    if (!file) {
-        alert('Please select a file first');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-        const response = await fetch('/generate', {
+        const fileInput = document.getElementById('fileInput');
+        const modelSelect = document.getElementById('modelSelect');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            alert('Please select a file first');
+            return;
+        }
+
+        console.log('Selected file:', file.name);
+        console.log('Selected model:', modelSelect.value);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('model', modelSelect.value);
+
+        const response = await fetch('/api/generate', {
             method: 'POST',
             body: formData
         });
 
         if (!response.ok) {
-            throw new Error('Network response was not ok');
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('Response data:', data); // Debug log
+        console.log('Response data:', data);
 
-        if (data.success) {
-            // Update visualization
-            window.visualizer.createVisualization(data.data);
-            
-            // Update analysis tab
-            const analysisTab = document.querySelector('.analysis-tab-content');
-            if (analysisTab) {
-                console.log('Updating analysis tab with:', data.analysis); // Debug log
-                analysisTab.innerHTML = `
-                    <div class="process-analysis">
-                        <h3>Process Analysis</h3>
-                        <div class="analysis-text">
-                            ${data.analysis.split('\n').map(line => 
-                                `<p>${line}</p>`
-                            ).join('')}
-                        </div>
-                    </div>
-                `;
-            } else {
-                console.error('Analysis tab element not found');
-            }
-        } else {
-            throw new Error(data.error || 'Unknown error');
-        }
+        displayResults(data);
     } catch (error) {
-        console.error('Error uploading file:', error);
+        console.error('Error:', error);
         alert('Error uploading file: ' + error.message);
     }
 }

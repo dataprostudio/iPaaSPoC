@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="view" to"ort" content="width=device-width, initial-scale=1.0">
     <title>NX8020™ Process Optimizer</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link href="https://unpkg.com/vis-network/styles/vis-network.min.css" rel="stylesheet" type="text/css" />
@@ -146,9 +146,23 @@
                     <h2 class="card-title">File Upload</h2>
                 </div>
                 <div class="card-content">
-                    <div class="file-upload">
-                        <input type="file" id="file-upload" name="file-upload">
-                        <button class="button" onclick="uploadFile()">Upload File</button>
+                    <div class="container">
+                        <div class="row mb-3">
+                            <div class="col">
+                                <input type="file" id="fileInput" class="form-control" />
+                            </div>
+                            <div class="col-auto">
+                                <button id="uploadButton" class="btn btn-primary" onclick="uploadFile()">Upload</button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col">
+                                <select id="modelSelect" class="form-select">
+                                    <option value="custom-model">Custom Model</option>
+                                    <option value="llama2">Llama 2</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -214,7 +228,7 @@
     <script src="/static/js/visualization.js"></script>
     <script>
         function uploadFile() {
-            const fileInput = document.getElementById('file-upload');
+            const fileInput = document.getElementById('fileInput');
             const file = fileInput.files[0];
             
             if (!file) {
